@@ -1,0 +1,25 @@
+&field_map_2d
+  half_width = 8.0
+  number_of_cells = 16
+  feedback_scale = 1.9285714285714286
+  trajectory_maximum_step = 0.25
+  minimum_substep_count = 1
+  boundary_relaxation_distance = 1.75
+  endpoint_policy = 'free_vortex'
+  asymptotic_center_x = 0.0
+  asymptotic_center_y = 0.0
+  asymptotic_bulk_gap = 0.2799
+  asymptotic_winding = 1.0
+  asymptotic_outer_radius = 24.0
+  asymptotic_maximum_step = 0.25
+  iteration_count = 1
+  convergence_tolerance = 1.0e-6
+  anderson_history_limit = 10
+  anderson_progress_threshold = 0.1
+  anderson_maximum_mixing = 5.0
+  order_parameter_file = 'new_src/op_xyz'
+  current_field_file = 'new_src/curr'
+  gauss_file = 'new_src/gauss11.dat'
+  ozaki_file = 'new_src/ozaki.dat'
+  output_file = 'work/fermiforge_2d_mpi_free_vortex.dat'
+/

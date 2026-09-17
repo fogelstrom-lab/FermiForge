@@ -1,0 +1,24 @@
+    Cpp Cpo Cpm
+    Cop Coo Com
+    Cmp Cmo Cmm
+
+   43. -.227267671E-02 -.351065096E-01 0.277147940E+00
+   43. 0.349076564E-01 0.275475607E+00 0.351031072E-01
+   43. 0.278017905E+00 -.350213649E-01 -.208214543E-02
+
+   70. -.837553198E-03 -.211230425E-01 0.278915925E+00 
+   70. 0.211210898E-01 0.278305844E+00 0.211279578E-01
+   70. 0.279241391E+00 -.211219401E-01 -.765173707E-03
+
+      Axx =  0.5*(cmp+cpm+cmm+cpp)
+      Axy = w*0.5*(cmm-cpp+cmp-cpm)
+      Axz =  (cmo+cpo)*sqrth
+
+      Ayx = w*0.5*(cpp-cmm-cmp+cpm)
+      Ayy =  0.5*(cmp+cpm-cmm-cpp)
+      Ayz = w*(cpo-cmo)*sqrth
+
+      Azx =  (com+cop)*sqrth
+      Azy = w*(cop-com)*sqrth
+      Azz =   coo
+

@@ -1,0 +1,11 @@
+0.30                  : t
+1.0                   : vort
+1                     : icyl (specular cylindrical container)
+5.40                  : Fs1
+4.0                   : rx
+4                     : tmax
+1.0                   : deliberately loose workflow-only tolerance
+10.0,3.0,10.0,3.0,2.0 : pmax
+1,1,1,1,1             : mmax
+1                     : istart (A-core seed)
+1                     : itmax

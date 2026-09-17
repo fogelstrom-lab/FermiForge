@@ -1,0 +1,69 @@
+c-------------------------------------------------------------
+c
+c        Parameters and common block variables
+c
+c--------------------------------------------------------------
+c
+      implicit none 
+c
+      complex w
+      real Rx,eps,pmax(10),dx
+      integer mx,nx,tmax,pkgsz,vecl,irep,mfrec
+ 
+      PARAMETER (w=(0.0,1.0))       
+      PARAMETER (nx=49)        
+      PARAMETER (mx=500) ! mx must .le. 20000 or change in trajetory.f
+      Parameter (mfrec=400)
+      PARAMETER (vecl=nx+1)
+      PARAMETER (pkgsz=vecl)
+
+      integer ienmax,itmax,caltyp,istart,inmax(10),icyl
+      real t,deltat,deltah,pi,esum,vc1,vc2,vc3,sqrt2,vort,subvort
+      real etad,etap,sqrth
+      real tau,sigma
+      real kx(0:400),ky(0:400),awei(0:400)
+      real kz(0:40),pwei(0:40)
+      common /vari/esum,kx,ky,awei,kz,pwei,pi,vort,subvort,
+     +             Rx,dx,t,deltat,deltah,vc1,vc2,vc3,sqrt2,sqrth,
+     +             eps,pmax,etad,etap,tau,sigma,
+     +             tmax,ienmax,itmax,irep,caltyp,inmax,icyl
+      logical pwave,dwave,cyl,outerr
+      common /sctype/pwave,dwave,cyl,outerr
+
+      integer Ncmax,NcCutof
+      real zp(100),Rp(100)
+      common /Ozakis/zp,Rp,Ncmax,NcCutof
+
+      real aa0
+      complex dxx(0:nx),dxy(0:nx),dxz(0:nx)
+      complex dyx(0:nx),dyy(0:nx),dyz(0:nx)
+      complex dzx(0:nx),dzy(0:nx),dzz(0:nx)
+      complex vx(0:nx),vy(0:nx),vz(0:nx)
+      common /vortex/dxx,dxy,dxz,dyx,dyy,dyz,dzx,dzy,dzz,vx,vy,vz,aa0
+
+      complex dnxx(0:nx),dnxy(0:nx),dnxz(0:nx)
+      complex dnyx(0:nx),dnyy(0:nx),dnyz(0:nx)
+      complex dnzx(0:nx),dnzy(0:nx),dnzz(0:nx)
+      complex nvx(0:nx),nvy(0:nx),nvz(0:nx)
+      common /newvortex/dnxx,dnxy,dnxz,dnyx,dnyy,dnyz,dnzx,dnzy,dnzz,
+     +                  nvx,nvy,nvz
+c
+c------------------------------------------------------------  
+c     Parameters needed for the parallel part
+c------------------------------------------------------------
+c
+      integer maxfrec,iruntyp
+      real erreps
+      common /runtyp/erreps,iruntyp,maxfrec
+
+      integer myid,nproc
+      common /MPIvariables/myid,nproc
+      include 'mpif.h'
+
+      integer MPIFLOAT,MPICMPLX
+      parameter (MPIFLOAT=MPI_DOUBLE_PRECISION)
+      parameter (MPICMPLX=MPI_DOUBLE_COMPLEX)
+c     parameter (MPIFLOAT=MPI_REAL)
+c     parameter (MPICMPLX=MPI_COMPLEX)
+c
+c-------------------------------------------------------------

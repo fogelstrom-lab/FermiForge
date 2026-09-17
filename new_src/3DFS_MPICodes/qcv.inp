@@ -1,0 +1,11 @@
+0.30                  : t
+1.0                   : vort
+1                     : icyl
+5.40                  : Fs1
+20.0                  : rx
+48                    : tmax
+2.e-6                 : errmax
+10.0,3.0,10.0,3.0,2.0 : pmax
+10,10,10,10,10        : mmax
+0                     : istart ( 0 => n-core, 1 => a-core, 2 => d-core, 3 => start from old config) 
+40                    : itmax

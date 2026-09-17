@@ -1,0 +1,11 @@
+0.30                  : t
+1.0                   : vort
+1                     : icyl (specular cylindrical container)
+5.40                  : Fs1
+20.0                  : rx
+48                    : tmax
+2.e-6                 : errmax
+10.0,3.0,10.0,3.0,2.0 : pmax
+10,10,10,10,10        : mmax
+1                     : istart (A-core seed)
+40                    : itmax per legacy AA stage

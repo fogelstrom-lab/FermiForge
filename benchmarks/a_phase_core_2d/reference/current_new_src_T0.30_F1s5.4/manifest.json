@@ -1,0 +1,46 @@
+{
+  "kind": "fermiforge_user_supplied_new_src_radial_reference",
+  "case": "free_a_phase_core",
+  "archived_at": "2026-09-17T21:07:13+02:00",
+  "temperature_over_tc": 0.3,
+  "winding": 1.0,
+  "cylindrical_container": false,
+  "fermi_liquid_f1s": 5.4,
+  "azimuth_count": 48,
+  "polar_count": 11,
+  "ozaki_pole_count": 8,
+  "radial_grid": {
+    "kind": "tangent",
+    "point_count": 100,
+    "outer_radius": 70.0,
+    "tangent_scale": 10.0
+  },
+  "initial_state": "converged_a_phase_core_restart",
+  "convergence_status": "user_confirmed_full_convergence",
+  "declared_tolerance": 2e-6,
+  "recorded_final_residual": null,
+  "restart_check": {
+    "initial_state_flag": 3,
+    "requested_iterations": 0,
+    "description": "Reload of the previously converged op_xyz and curr fields"
+  },
+  "independent_point_map": {
+    "radial_index": 24,
+    "radius": 3.6095394702719363,
+    "cartesian_spacing": 0.125,
+    "maximum_absolute_gap_difference": 3.6068e-5,
+    "maximum_relative_gap_difference": 1.1983e-4,
+    "maximum_absolute_mean_field_difference": 6.0659e-6,
+    "maximum_normalization_error": 1.2212e-15
+  },
+  "files_sha256": {
+    "op_xyz": "486314c7a0d3f7ffd595f698127e8acec8e8e022f832b0f3a38c39c00087da17",
+    "curr": "7dcbae2650bbcc006f0052b30b1c1812b3566a10dabbbee20255d2e24d89bf60",
+    "restart_check.inp": "d009b194778e9fa188bf133c4fcc8386eec7efe1eed44acfc96189ea2e92eea5",
+    "gauss11.dat": "10d155ee70c0b5efa1b00c88a4d6a47e4780f9b429a82fcf77705f847fd50c19",
+    "ozaki.dat": "66ba2d7810ecef3e4ad4bf820d349abc1be3c086b39e54684f0ad6b55a060ea5",
+    "xgrid.dat": "ef80a23d02e5a6b7a7319ff60f0a270284b26e84eb3dd8ea9aa34c66e655d214",
+    "point_24.expected": "c76546627f57fa093f96f7877bf7356f0583cb666ab1c4b7a17749afca9eaba6",
+    "reference-point-24.txt": "5b62ce7eeee6278ccedcdf1c612644276d2f8215b6403399e1fd17e1dac87afd"
+  }
+}

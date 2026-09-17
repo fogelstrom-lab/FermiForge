@@ -1,0 +1,56 @@
+{
+  "absolute_tolerance": 1e-10,
+  "candidate_directory": "/Users/mikael/Documents/Codex/3he-vortex-modernization/runs/g0-smoke/20260915-143844-g0-contained-r10",
+  "comparison_grid": "reference",
+  "comparisons": {
+    "curr": {
+      "candidate_interpolated_to_reference_grid": false,
+      "candidate_points": 50,
+      "maximum_absolute_error": 0.0,
+      "maximum_tolerance_scaled_error": 0.0,
+      "passed": true,
+      "radial_interval": [
+        0.0,
+        4.0
+      ],
+      "reference_points": 50,
+      "relative_l2_error": 0.0,
+      "rms_absolute_error": 0.0,
+      "values_compared": 200
+    },
+    "op_harm": {
+      "candidate_interpolated_to_reference_grid": false,
+      "candidate_points": 50,
+      "maximum_absolute_error": 0.0,
+      "maximum_tolerance_scaled_error": 0.0,
+      "passed": true,
+      "radial_interval": [
+        0.0,
+        4.0
+      ],
+      "reference_points": 50,
+      "relative_l2_error": 0.0,
+      "rms_absolute_error": 0.0,
+      "values_compared": 900
+    },
+    "op_xyz": {
+      "candidate_interpolated_to_reference_grid": false,
+      "candidate_points": 50,
+      "maximum_absolute_error": 0.0,
+      "maximum_tolerance_scaled_error": 0.0,
+      "passed": true,
+      "radial_interval": [
+        0.0,
+        4.0
+      ],
+      "reference_points": 50,
+      "relative_l2_error": 0.0,
+      "rms_absolute_error": 0.0,
+      "values_compared": 900
+    }
+  },
+  "gauge_alignment": "none; inputs must use the same gauge and orientation",
+  "passed": true,
+  "reference_directory": "/Users/mikael/Documents/Codex/3he-vortex-modernization/runs/g0-smoke/20260915-143817-g0-contained-r1",
+  "relative_tolerance": 1e-08
+}

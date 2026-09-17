@@ -1,0 +1,36 @@
+c-------------------------------------------------------------------
+c
+c        Parameters and common block variables
+c
+c-------------------------------------------------------------------
+c
+      implicit none
+c
+c-- Some short-hand parameters
+c
+      complex czero,w,cone
+      PARAMETER (czero=(0.0,0.0))
+      PARAMETER ( cone=(1.0,1.0))
+      PARAMETER (    w=(0.0,1.0))
+c
+c-- Variables set in the main program
+c
+      real pi,pih,pi2,s2,t,eps,dv,norm
+      integer irep,ienmax,inttyp
+      common /Ginput/pi,pih,pi2,s2,t,norm,
+     +              eps,dv,ienmax,irep,inttyp
+c
+c-- The iterated gaps and impurity self energies
+c
+      real rop1,theta,ps,js
+      common /Gselfenergies/rop1,theta,ps,js
+      complex ag2,ag3
+      common /greenies/ag2,ag3
+c
+c-- Common variables used over one processor
+c
+      complex en
+      common /Gvari/en
+c
+c---------------------------------------------------------------------
+

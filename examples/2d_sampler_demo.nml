@@ -1,0 +1,25 @@
+&demo_2d
+  ! This is a manufactured visualization and interpolation test, not a
+  ! self-consistent quasiclassical solution.
+  x_minimum = -8.0
+  x_maximum = 8.0
+  number_of_x_cells = 128
+
+  y_minimum = -8.0
+  y_maximum = 8.0
+  number_of_y_cells = 128
+
+  core_width = 1.0
+  texture_width = 3.0
+  off_diagonal_scale = 0.18
+
+  current_scale = 0.40
+  axial_current_scale = 0.035
+  phase_winding = 1
+
+  ! Cell centers exercise the bilinear sampler. Set false to write nodes.
+  output_at_cell_centers = .true.
+
+  ! The run wrapper overrides this with a file in its timestamped archive.
+  output_file = 'fermiforge_2d_demo.dat'
+/

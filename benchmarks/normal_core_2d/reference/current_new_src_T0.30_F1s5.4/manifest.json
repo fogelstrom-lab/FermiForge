@@ -1,0 +1,43 @@
+{
+  "kind": "fermiforge_new_src_radial_reference",
+  "case": "free_normal_core",
+  "created_at": "2026-09-17T11:17:00+02:00",
+  "source_tree": "new_src",
+  "source_executable_sha256": "91c89e1f43ca9d015299737950b23e78e9355de92e6776efc06933af56673710",
+  "mpi_ranks": 10,
+  "temperature_over_tc": 0.3,
+  "winding": 1.0,
+  "cylindrical_container": false,
+  "fermi_liquid_f1s": 5.4,
+  "azimuth_count": 48,
+  "polar_count": 11,
+  "ozaki_pole_count": 8,
+  "radial_grid": {
+    "kind": "tangent",
+    "point_count": 100,
+    "outer_radius": 70.0,
+    "tangent_scale": 10.0
+  },
+  "initial_state": "normal_core",
+  "initial_simple_iterations": 5,
+  "iteration_engine": "legacy_anderson_mixing_modern_translation",
+  "anderson_iterations": 37,
+  "anderson_history_limit": 10,
+  "anderson_p_max": 5.0,
+  "declared_tolerance": 2e-6,
+  "final_average_residual": 5.130e-9,
+  "final_maximum_residual": 1.562e-6,
+  "terminal_status": "converged",
+  "files_sha256": {
+    "input.inp": "7792278791faf88f76d7b2df1e0adb3981e2cdb2fade9d6b0c2c58c6c4ac299e",
+    "gauss11.dat": "10d155ee70c0b5efa1b00c88a4d6a47e4780f9b429a82fcf77705f847fd50c19",
+    "ozaki.dat": "66ba2d7810ecef3e4ad4bf820d349abc1be3c086b39e54684f0ad6b55a060ea5",
+    "xgrid.dat": "ef80a23d02e5a6b7a7319ff60f0a270284b26e84eb3dd8ea9aa34c66e655d214",
+    "op_xyz": "131dac484a76fc3d61ad965c504d0bc90d396476f45b8c1a7df89287eddb206a",
+    "op_harm": "be13e12ee35f47606fa55bb99fcaceb0560a04509f9bcb63b897fc264b1e1204",
+    "curr": "17f8c5977bd6711ce87bf5ac3c1fe83e18cbe100928b55bbe0c4e7aaaa63b61c",
+    "error_log_AA.dat": "196cd925db9e58b08cfec5acc8b0f4c484c8863e0e8b09d39b7dc547757dd3f0",
+    "solver.log": "366819e6a4b823e2a48a95fdb6139cda0b3d379711ecbb8b08b40b2519a4dd18",
+    "point_24.expected": "29d71f7679de3ee85d7cfe4530459a1c6c25b02ff157ef976e10c93367931b01"
+  }
+}

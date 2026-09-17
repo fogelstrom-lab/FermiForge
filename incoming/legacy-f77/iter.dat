@@ -1,0 +1,34 @@
+c-----------------------------------------------------------------------
+c     Parameters needed for the parallel part
+c-----------------------------------------------------------------------
+c
+      integer iruntyp,maxfrec
+      real erreps
+      common /runtyp/erreps,iruntyp,maxfrec
+      integer myid,nproc
+      common /MPIvariables/myid,nproc
+c
+c-----------------------------------------------------------------------
+c     the parameter statements not used in citerat follow:
+c----------------------------------------------------------------------
+c
+      integer nx,vecl,npointss
+      parameter(NX=49,vecl=nx+1,NPOINTSS=vecl) 
+                    ! NPOINTSS: > number of grid points 
+c
+c----------------------------------------------------------------------
+c     the parameter statements for citerat follow:
+c----------------------------------------------------------------------
+c
+      integer mmax0,nn0,ldn,ldm,ndim
+      parameter(  mmax0=10 , nn0=21*npointss)
+      !           maximal dimension of subspace = mmax0
+      !           maximal dimension of long vector = nn0
+      !           (in my case I calculate nn0 from other parameters)
+      parameter(  ldn=nn0 , ldm=mmax0+1 , ndim=(2*nn0+ldm+1)*ldm )
+      !           ldn,ldm and ndim are used in citerat
+c
+c    This two parameter statements are used in the subroutines
+c    'citerat','excluse','rearrange', and 'stoch' of the citerat-file.
+c
+c-----------------------------------------------------------------------

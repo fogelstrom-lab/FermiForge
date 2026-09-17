@@ -1,0 +1,10 @@
+0.30                  : t
+1.0                   : vort
+0                     : icyl (free vortex)
+5.40                  : F1s
+48                    : azimuthal directions
+2.e-6                 : convergence tolerance
+0                     : normal-core initial state
+3                     : Anderson mixing
+80                    : maximum accelerated iterations
+5.0                   : Anderson p_max

@@ -1,0 +1,10 @@
+0.30                  : t
+1.0                   : vort
+0                     : icyl
+5.40                  : Fs1
+48                    : tmax
+2.e-6                 : errmax
+3                     : istart ( 0 => n-core, 1 => a-core, 2 => d-core, 3 => start from old config) 
+3                     : ittyp ( 0 = simple relaxation, 1 = Broyden, 2 = Borzilai-Borweini, 3 = Anderson mixing)
+00                   : itmax
+5.0                   : AA p_max (used when ittyp = 3)

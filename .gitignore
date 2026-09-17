@@ -1,0 +1,72 @@
+# macOS and editor metadata
+.DS_Store
+.AppleDouble
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Fortran, CMake, Ninja, and compiler products
+*.o
+*.mod
+*.smod
+*.a
+*.so
+*.dylib
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+DartConfiguration.tcl
+Testing/
+.ninja_deps
+.ninja_log
+compile_commands.json
+build/
+build-*/
+
+# FermiForge scratch builds, generated plots, and archived local runs.
+# Canonical benchmark definitions and compact comparison reports belong under
+# benchmarks/ and are intentionally tracked.
+/work/
+/tmp/
+/runs/
+
+# Products generated in the active transitional radial source directory.
+# Suffixed historical reference datasets remain trackable.
+/new_src/qcv
+/new_src/qcv.
+/new_src/gap
+/new_src/egrid
+/new_src/fort.*
+/new_src/xgrid.dat
+/new_src/error_log_*.dat
+/new_src/op_xyz
+/new_src/op_harm
+/new_src/curr
+
+# The historical source snapshots contain locally built extensionless
+# executables in nested directories as well.
+/new_src/**/qcv
+/new_src/**/gap
+/new_src/**/egrid
+/new_src/**/fort.*
+/new_src/**/xgrid.dat
+/new_src/**/error_log_*.dat
+
+# Local credentials and signing material must never be committed.
+.env
+.env.*
+*.pem
+*.key
+*.p12

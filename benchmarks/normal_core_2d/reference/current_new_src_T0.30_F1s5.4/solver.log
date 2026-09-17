@@ -1,0 +1,56 @@
+ n-c(0)/a-c(1)/d-c(2)/old(3)    :     0
+ Temperature                    :   0.3000
+ Vorticity                      :   1.0000
+     Vcs0                       :   0.0561
+     As1(Fs1)                   :   1.9286   (  5.4000)
+ Delta(T)                       :   0.2799
+ Grid radius                    :  70.0000
+ integration step               :   0.1750
+ Accuracy                       :   0.20E-05
+ Nr. of trajs                   :    48
+ Nr. of freqs                   :     8
+ Ittyp (0=NN, 1=BR, 2=BB, AA=3) :     3
+ Max iterations                 :    80
+ AA p_max                       :   5.0000
+solved (NN) :     1 time (c,w) [s]    20.0    20.0 error(avg,max)= (  0.6583E-01  0.2544E+02)
+solved (NN) :     2 time (c,w) [s]    20.0    20.0 error(avg,max)= (  0.2753E-01  0.9090E+01)
+solved (NN) :     3 time (c,w) [s]    19.9    20.0 error(avg,max)= (  0.1514E-01  0.4282E+01)
+solved (NN) :     4 time (c,w) [s]    20.1    20.1 error(avg,max)= (  0.1010E-01  0.3209E+01)
+solved (NN) :     5 time (c,w) [s]    20.4    20.4 error(avg,max)= (  0.7838E-02  0.3006E+01)
+solved (AA) :     1 time (c,w) [s]    20.2    20.3 error(avg,max)= (  0.6658E-02  0.2813E+01) p =  0.01 md =   1
+solved (AA) :     2 time (c,w) [s]    19.9    19.9 error(avg,max)= (  0.6650E-02  0.2811E+01) p =  2.21 md =   2
+solved (AA) :     3 time (c,w) [s]    19.9    19.9 error(avg,max)= (  0.3481E-02  0.1634E+01) p =  4.50 md =   3
+solved (AA) :     4 time (c,w) [s]    20.1    20.2 error(avg,max)= (  0.2326E-02  0.8564E+00) p =  2.91 md =   4
+solved (AA) :     5 time (c,w) [s]    20.3    20.4 error(avg,max)= (  0.1502E-02  0.6726E+00) p =  3.54 md =   5
+solved (AA) :     6 time (c,w) [s]    20.0    20.1 error(avg,max)= (  0.2182E-02  0.1776E+01) p =  2.77 md =   6
+solved (AA) :     7 time (c,w) [s]    20.0    20.0 error(avg,max)= (  0.6883E-03  0.2326E+00) p =  1.99 md =   7
+solved (AA) :     8 time (c,w) [s]    20.0    20.0 error(avg,max)= (  0.3845E-03  0.1156E+00) p =  4.18 md =   8
+solved (AA) :     9 time (c,w) [s]    20.3    20.8 error(avg,max)= (  0.5789E-03  0.2937E+00) p =  3.07 md =   9
+solved (AA) :    10 time (c,w) [s]    20.7    21.7 error(avg,max)= (  0.1720E-03  0.7481E-01) p =  2.81 md =  10
+solved (AA) :    11 time (c,w) [s]    22.9    33.7 error(avg,max)= (  0.1322E-03  0.6382E-01) p =  1.90 md =  10
+solved (AA) :    12 time (c,w) [s]    22.6    29.9 error(avg,max)= (  0.8455E-04  0.2845E-01) p =  2.89 md =  10
+solved (AA) :    13 time (c,w) [s]    20.8    20.9 error(avg,max)= (  0.6504E-04  0.3321E-01) p =  3.16 md =  10
+solved (AA) :    14 time (c,w) [s]    20.9    21.0 error(avg,max)= (  0.5630E-04  0.3439E-01) p =  2.25 md =  10
+solved (AA) :    15 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.3424E-04  0.1306E-01) p =  2.84 md =  10
+solved (AA) :    16 time (c,w) [s]    21.1    21.3 error(avg,max)= (  0.2841E-04  0.1672E-01) p =  3.27 md =  10
+solved (AA) :    17 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.2314E-04  0.1438E-01) p =  2.57 md =  10
+solved (AA) :    18 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.1125E-04  0.6598E-02) p =  3.37 md =  10
+solved (AA) :    19 time (c,w) [s]    21.1    21.3 error(avg,max)= (  0.1026E-04  0.7322E-02) p =  1.80 md =  10
+solved (AA) :    20 time (c,w) [s]    21.1    21.3 error(avg,max)= (  0.3778E-05  0.1122E-02) p =  3.19 md =  10
+solved (AA) :    21 time (c,w) [s]    21.1    21.2 error(avg,max)= (  0.2876E-05  0.1706E-02) p =  2.78 md =  10
+solved (AA) :    22 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.2479E-05  0.1835E-02) p =  3.27 md =  10
+solved (AA) :    23 time (c,w) [s]    21.1    21.6 error(avg,max)= (  0.2047E-05  0.1071E-02) p =  1.90 md =  10
+solved (AA) :    24 time (c,w) [s]    21.8    23.0 error(avg,max)= (  0.6986E-06  0.2403E-03) p =  2.96 md =  10
+solved (AA) :    25 time (c,w) [s]    23.1    31.4 error(avg,max)= (  0.5301E-06  0.3349E-03) p =  2.10 md =  10
+solved (AA) :    26 time (c,w) [s]    23.8    34.7 error(avg,max)= (  0.4085E-06  0.2954E-03) p =  3.19 md =  10
+solved (AA) :    27 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.2776E-06  0.2202E-03) p =  2.69 md =  10
+solved (AA) :    28 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.2222E-06  0.1443E-03) p =  2.02 md =  10
+solved (AA) :    29 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.1177E-06  0.3859E-04) p =  4.29 md =  10
+solved (AA) :    30 time (c,w) [s]    21.2    21.4 error(avg,max)= (  0.1212E-06  0.8760E-04) p =  3.04 md =  10
+solved (AA) :    31 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.7544E-07  0.5050E-04) p =  3.49 md =  10
+solved (AA) :    32 time (c,w) [s]    21.1    21.3 error(avg,max)= (  0.4922E-07  0.3334E-04) p =  2.07 md =  10
+solved (AA) :    33 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.2123E-07  0.5573E-05) p =  2.05 md =  10
+solved (AA) :    34 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.1724E-07  0.5192E-05) p =  3.12 md =  10
+solved (AA) :    35 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.1490E-07  0.9231E-05) p =  3.42 md =  10
+solved (AA) :    36 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.1318E-07  0.1079E-04) p =  2.02 md =  10
+solved (AA) :    37 time (c,w) [s]    21.0    21.2 error(avg,max)= (  0.5130E-08  0.1562E-05) p =  2.55 md =  10
