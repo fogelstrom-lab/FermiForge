@@ -2,7 +2,7 @@
 
 Scalable quasiclassical simulation of spinful superfluids and superconductors.
 
-Status: living project plan, version 1, 2026-09-15
+Status: living project plan, version 2, 2026-09-18
 
 Execution is tracked in `MILESTONE_BACKLOG.md`; mathematical definitions are
 kept in `architecture/MATHEMATICAL_CONVENTIONS.md`. This document remains the
@@ -28,6 +28,17 @@ The framework should ultimately cover:
   interfaces;
 - equilibrium self-consistency first, with spectroscopy and nonequilibrium
   extensions added only after the equilibrium foundation is reliable.
+
+### Collaboration-readiness target
+
+The GitHub repository at
+<https://github.com/fogelstrom-lab/FermiForge> is the canonical project home.
+It will serve as the shared technical basis for collaborative FermiForge work
+beginning in March 2027. Before that point, the project should have a documented
+license and provenance policy, reproducible Linux and macOS build instructions,
+automated regression tests, contributor guidance, and accepted normal- and
+A-phase-core two-dimensional reference workflows. Scientific validation gates
+remain authoritative; the collaboration date does not justify bypassing them.
 
 ### Immediate scientific target
 

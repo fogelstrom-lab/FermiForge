@@ -6,7 +6,7 @@ readonly script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly project_root="$(cd "${script_directory}/.." && pwd)"
 readonly default_branch="${FERMIFORGE_BRANCH:-main}"
 readonly remote_name="${FERMIFORGE_REMOTE_NAME:-origin}"
-readonly default_remote_url="git@gitlab.com:fogelstrom-lab/FermiForge.git"
+readonly default_remote_url="git@github.com:fogelstrom-lab/FermiForge.git"
 readonly maximum_file_bytes="${FERMIFORGE_MAX_FILE_BYTES:-26214400}"
 
 branch="${default_branch}"
@@ -25,14 +25,13 @@ Usage: tools/upload_to_git.sh [options]
 Safely test, commit, and upload the FermiForge source tree.
 
 Default destination:
-  git@gitlab.com:fogelstrom-lab/FermiForge.git
+  git@github.com:fogelstrom-lab/FermiForge.git
 
 Options:
   -m, --message TEXT       Commit message. A dated message is used by default.
       --remote-url URL     Override the Git remote URL.
       --github             Use git@github.com:fogelstrom-lab/FermiForge.git.
-      --gitlab             Use git@gitlab.com:fogelstrom-lab/FermiForge.git.
-      --https              Use the GitLab HTTPS URL instead of SSH.
+      --https              Use the GitHub HTTPS URL instead of SSH.
       --replace-remote     Replace an existing origin with --remote-url.
       --branch NAME        Branch to upload (default: main).
       --skip-tests         Do not run the CMake/CTest verification gate.
@@ -73,12 +72,8 @@ while (($# > 0)); do
       remote_url="git@github.com:fogelstrom-lab/FermiForge.git"
       shift
       ;;
-    --gitlab)
-      remote_url="git@gitlab.com:fogelstrom-lab/FermiForge.git"
-      shift
-      ;;
     --https)
-      remote_url="https://gitlab.com/fogelstrom-lab/FermiForge.git"
+      remote_url="https://github.com/fogelstrom-lab/FermiForge.git"
       shift
       ;;
     --replace-remote)
@@ -272,7 +267,7 @@ if git remote get-url "${remote_name}" >/dev/null 2>&1; then
   fi
 else
   [[ -n "${remote_url}" ]] || fail \
-    "no ${remote_name} remote; pass --github, --gitlab, or --remote-url URL"
+    "no ${remote_name} remote; pass --github, --https, or --remote-url URL"
   git remote add "${remote_name}" "${remote_url}"
   configured_url="${remote_url}"
 fi

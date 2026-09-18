@@ -1570,3 +1570,17 @@ Extended the ignore rules to exclude extensionless executables and transient
 products in nested legacy-source directories. Whitespace checks apply to the
 maintained code and documentation while preserving imported legacy sources
 and numerical reference data byte for byte.
+
+## 2026-09-18 - GitHub established as the canonical repository
+
+Confirmed that `fogelstrom-lab/FermiForge` is the existing GitHub project and
+published the initial FermiForge import there. Changed the guarded publishing
+helper and current documentation from the provisional GitLab default to
+`git@github.com:fogelstrom-lab/FermiForge.git`; its HTTPS option now also
+targets GitHub. The local `main` branch tracks `origin/main` without rewritten
+history.
+
+Recorded March 2027 as the start of collaborative FermiForge development. The
+repository will be prepared before then with explicit licensing and provenance,
+cross-platform onboarding, automated regression tests, contributor guidance,
+and accepted two-dimensional normal- and A-phase-core workflows.

@@ -42,6 +42,10 @@ build-*/
 /tmp/
 /runs/
 
+# Local convenience wrapper. The maintained publisher is
+# tools/upload_to_git.sh, whose canonical default is GitHub.
+/push_to_github.sh
+
 # Products generated in the active transitional radial source directory.
 # Suffixed historical reference datasets remain trackable.
 /new_src/qcv

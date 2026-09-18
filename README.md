@@ -5,6 +5,11 @@ superfluids and superconductors. This workspace contains an immutable legacy
 Fortran 77/MPI reference and a modern Fortran implementation being developed
 alongside it.
 
+The canonical repository is
+<https://github.com/fogelstrom-lab/FermiForge>. It is being prepared as the
+shared technical foundation for collaborative FermiForge development beginning
+in March 2027.
+
 The staged scientific and software roadmap is maintained in
 `docs/PROJECT_PLAN.md`. Its immediate target is a validated two-dimensional,
 spinful calculation of the free double-core vortex in 3He-B; general device
@@ -190,13 +195,13 @@ The guarded upload helper runs the strict CMake/CTest suite, previews and
 stages changes, rejects individual files larger than 25 MiB, asks for final
 confirmation, commits, checks the remote branch for fast-forward ancestry,
 and pushes without ever using a force option. Its default destination is the
-FermiForge GitLab repository:
+canonical FermiForge GitHub repository:
 
 ```text
 tools/upload_to_git.sh -m "Initial FermiForge import"
 ```
 
-Use HTTPS instead of SSH if that is how GitLab authentication is configured:
+Use HTTPS instead of SSH if that is how GitHub authentication is configured:
 
 ```text
 tools/upload_to_git.sh --https -m "Initial FermiForge import"
