@@ -15,20 +15,20 @@ The benchmark separates four questions:
    at every 2D grid point?
 3. Does the propagated and momentum-integrated 2D map complete without loss of
    propagator normalization?
-4. How closely does one 2D self-consistency map reproduce the converged radial
-   state?
+4. Does the full repeated 2D self-consistency solve converge under the legacy
+   Anderson engine?
+5. Does its final field reproduce the radial qcv state and remain stable when
+   the computational cell is enlarged?
 
 Questions 1--3 are acceptance checks. The comparison in question 2 evaluates
 the radial profile directly at each `(x,y)` point; it deliberately does not
 infer harmonics back from an off-axis Cartesian field because the legacy
 transport reconstruction enforces `A_xy=-A_yx` and is lossy in that subspace.
-The RMS, maximum, and relative L2 map
-residuals for question 4 are recorded as convergence-study metrics.  They are
-not yet hard-coded as pass/fail tolerances because the uniform grid cannot
-simultaneously resolve the core and provide the required large trajectory
-domain. The independently tested one-point oracle supplies the physics-kernel
-acceptance check. The first static multiscale field mesh now complements this
-oracle; automatic error-driven block refinement remains under development.
+The RMS, maximum, and relative L2 map residuals are recorded at every
+evaluation. The independently tested one-point oracle supplies the
+physics-kernel acceptance check. The static multiscale mesh now supports a
+complete fixed-mesh nonlinear solve and restart; automatic error-driven block
+refinement remains under development.
 
 ## Reference status
 
@@ -51,7 +51,7 @@ From the FermiForge project root:
   --case-name normal-core --initialization radial-reference --ranks 10
 ```
 
-This is the preferred command: it builds the benchmark, creates a timestamped
+This is the preferred one-map command: it builds the benchmark, creates a timestamped
 archive, preserves the input and logs, hashes the executable and data, and
 plots both the embedded reference and mapped field with the accessible colour
 scales. The lower-level equivalent is:
@@ -68,9 +68,10 @@ mpiexec --host localhost:10 --map-by ppr:10:node --bind-to none -n 10 \
   examples/2d_normal_core_benchmark.nml
 ```
 
-The run writes the embedded radial input, the quasiclassical mapped field, and
-a machine-readable metrics file.  Both maps use the standard 2D output format
-and can be plotted with `tools/plot_2d_fields.py`.
+The run writes the embedded radial input, the quasiclassical mapped field, the
+final state, an iteration history, and a machine-readable metrics file. The
+full converged multiscale and computational-cell commands are documented in
+`docs/RUNNING_NORMAL_CORE_2D_SOLVER.md`.
 
 ## Required convergence matrix
 

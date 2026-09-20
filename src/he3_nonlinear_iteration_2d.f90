@@ -4,7 +4,10 @@ module he3_nonlinear_iteration_2d
   use spinful_state_2d, only : spinful_state_2d_t, allocate_spinful_state_2d
   use new_src_iteration_layout_2d, only : &
     new_src_iteration_vector_size_2d, pack_new_src_iteration_vector_2d, &
-    unpack_new_src_iteration_vector_2d
+    unpack_new_src_iteration_vector_2d, &
+    new_src_masked_iteration_vector_size_2d, &
+    pack_new_src_masked_iteration_vector_2d, &
+    unpack_new_src_masked_iteration_vector_2d
   use legacy_anderson_mixing, only : legacy_anderson_t, anderson_report_t
   implicit none
   private
@@ -124,7 +127,7 @@ contains
 
   subroutine update_he3_state_with_anderson( &
       mesh, accelerator, current, mapped, tolerance, next, &
-      anderson_report, residual_report)
+      anderson_report, residual_report, active_point_mask)
     type(cartesian_mesh_2d_t), intent(in) :: mesh
     type(legacy_anderson_t), intent(inout) :: accelerator
     type(spinful_state_2d_t), intent(in) :: current, mapped
@@ -132,24 +135,43 @@ contains
     type(spinful_state_2d_t), intent(out) :: next
     type(anderson_report_t), intent(out) :: anderson_report
     type(he3_field_residual_report_t), intent(out) :: residual_report
+    logical, intent(in), optional :: active_point_mask(:)
 
     real(rk), allocatable :: current_vector(:), mapped_vector(:), next_vector(:)
 
     if (.not. current%is_valid_for(mesh) .or. &
         .not. mapped%is_valid_for(mesh)) &
       error stop "Anderson state does not match the Cartesian mesh"
-    if (accelerator%vector_size() /= &
-        new_src_iteration_vector_size_2d(current)) &
-      error stop "Anderson accelerator has the wrong 2D vector size"
-
-    call compute_he3_field_residual(current, mapped, residual_report)
-    call pack_new_src_iteration_vector_2d(current, current_vector)
-    call pack_new_src_iteration_vector_2d(mapped, mapped_vector)
+    if (present(active_point_mask)) then
+      if (accelerator%vector_size() /= &
+          new_src_masked_iteration_vector_size_2d( &
+            current, active_point_mask)) &
+        error stop "Anderson accelerator has the wrong masked 2D vector size"
+      call compute_he3_field_residual( &
+        current, mapped, residual_report, active_point_mask)
+      call pack_new_src_masked_iteration_vector_2d( &
+        current, active_point_mask, current_vector)
+      call pack_new_src_masked_iteration_vector_2d( &
+        mapped, active_point_mask, mapped_vector)
+    else
+      if (accelerator%vector_size() /= &
+          new_src_iteration_vector_size_2d(current)) &
+        error stop "Anderson accelerator has the wrong 2D vector size"
+      call compute_he3_field_residual(current, mapped, residual_report)
+      call pack_new_src_iteration_vector_2d(current, current_vector)
+      call pack_new_src_iteration_vector_2d(mapped, mapped_vector)
+    end if
     allocate(next_vector(size(current_vector)))
     call accelerator%update( &
       current_vector, mapped_vector, tolerance, next_vector, anderson_report)
-    call allocate_spinful_state_2d(mesh, next)
-    call unpack_new_src_iteration_vector_2d(next_vector, next)
+    if (present(active_point_mask)) then
+      next = current
+      call unpack_new_src_masked_iteration_vector_2d( &
+        next_vector, active_point_mask, next)
+    else
+      call allocate_spinful_state_2d(mesh, next)
+      call unpack_new_src_iteration_vector_2d(next_vector, next)
+    end if
   end subroutine update_he3_state_with_anderson
 
 end module he3_nonlinear_iteration_2d

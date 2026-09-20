@@ -11,6 +11,9 @@ module new_src_iteration_layout_2d
   public :: new_src_iteration_vector_size_2d
   public :: pack_new_src_iteration_vector_2d
   public :: unpack_new_src_iteration_vector_2d
+  public :: new_src_masked_iteration_vector_size_2d
+  public :: pack_new_src_masked_iteration_vector_2d
+  public :: unpack_new_src_masked_iteration_vector_2d
 
 contains
 
@@ -19,6 +22,16 @@ contains
 
     vector_size = new_src_values_per_2d_point * state%point_count()
   end function new_src_iteration_vector_size_2d
+
+
+  integer function new_src_masked_iteration_vector_size_2d( &
+      state, active_point_mask) result(vector_size)
+    type(spinful_state_2d_t), intent(in) :: state
+    logical, intent(in) :: active_point_mask(:)
+
+    call require_valid_mask(state, active_point_mask)
+    vector_size = new_src_values_per_2d_point * count(active_point_mask)
+  end function new_src_masked_iteration_vector_size_2d
 
 
   subroutine pack_new_src_iteration_vector_2d(state, vector)
@@ -52,6 +65,44 @@ contains
       vector(block_start:block_end) = state%current_mean_field(component, :)
     end do
   end subroutine pack_new_src_iteration_vector_2d
+
+
+  subroutine pack_new_src_masked_iteration_vector_2d( &
+      state, active_point_mask, vector)
+    type(spinful_state_2d_t), intent(in) :: state
+    logical, intent(in) :: active_point_mask(:)
+    real(rk), allocatable, intent(out) :: vector(:)
+
+    integer :: component, orbital, point, position, spin
+
+    call require_valid_mask(state, active_point_mask)
+    allocate(vector(new_src_masked_iteration_vector_size_2d( &
+      state, active_point_mask)))
+    position = 0
+    do spin = 1, spin_components_2d
+      do orbital = 1, orbital_components_2d
+        do point = 1, state%point_count()
+          if (.not. active_point_mask(point)) cycle
+          position = position + 1
+          vector(position) = &
+            real(state%order_parameter(spin, orbital, point), kind=rk)
+        end do
+        do point = 1, state%point_count()
+          if (.not. active_point_mask(point)) cycle
+          position = position + 1
+          vector(position) = &
+            aimag(state%order_parameter(spin, orbital, point))
+        end do
+      end do
+    end do
+    do component = 1, mean_field_components_2d
+      do point = 1, state%point_count()
+        if (.not. active_point_mask(point)) cycle
+        position = position + 1
+        vector(position) = state%current_mean_field(component, point)
+      end do
+    end do
+  end subroutine pack_new_src_masked_iteration_vector_2d
 
 
   subroutine unpack_new_src_iteration_vector_2d(vector, state)
@@ -90,6 +141,46 @@ contains
   end subroutine unpack_new_src_iteration_vector_2d
 
 
+  subroutine unpack_new_src_masked_iteration_vector_2d( &
+      vector, active_point_mask, state)
+    real(rk), intent(in) :: vector(:)
+    logical, intent(in) :: active_point_mask(:)
+    type(spinful_state_2d_t), intent(inout) :: state
+
+    integer :: component, orbital, point, position, spin
+    real(rk), allocatable :: real_part(:)
+
+    call require_valid_mask(state, active_point_mask)
+    if (size(vector) /= new_src_masked_iteration_vector_size_2d( &
+        state, active_point_mask)) &
+      error stop "masked new_src 2D iteration vector has the wrong size"
+    allocate(real_part(state%point_count()), source=0.0_rk)
+    position = 0
+    do spin = 1, spin_components_2d
+      do orbital = 1, orbital_components_2d
+        do point = 1, state%point_count()
+          if (.not. active_point_mask(point)) cycle
+          position = position + 1
+          real_part(point) = vector(position)
+        end do
+        do point = 1, state%point_count()
+          if (.not. active_point_mask(point)) cycle
+          position = position + 1
+          state%order_parameter(spin, orbital, point) = &
+            cmplx(real_part(point), vector(position), kind=rk)
+        end do
+      end do
+    end do
+    do component = 1, mean_field_components_2d
+      do point = 1, state%point_count()
+        if (.not. active_point_mask(point)) cycle
+        position = position + 1
+        state%current_mean_field(component, point) = vector(position)
+      end do
+    end do
+  end subroutine unpack_new_src_masked_iteration_vector_2d
+
+
   subroutine require_complete_state(state)
     type(spinful_state_2d_t), intent(in) :: state
 
@@ -104,5 +195,17 @@ contains
         size(state%current_mean_field, 2) /= state%point_count()) &
       error stop "2D spinful state has inconsistent component dimensions"
   end subroutine require_complete_state
+
+
+  subroutine require_valid_mask(state, active_point_mask)
+    type(spinful_state_2d_t), intent(in) :: state
+    logical, intent(in) :: active_point_mask(:)
+
+    call require_complete_state(state)
+    if (size(active_point_mask) /= state%point_count()) &
+      error stop "2D iteration mask has the wrong point count"
+    if (.not. any(active_point_mask)) &
+      error stop "2D iteration mask contains no active points"
+  end subroutine require_valid_mask
 
 end module new_src_iteration_layout_2d

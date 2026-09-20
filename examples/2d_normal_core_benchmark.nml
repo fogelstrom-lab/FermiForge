@@ -27,7 +27,20 @@
   asymptotic_matching_radius = 0.0
   asymptotic_outer_radius = 70.0
   asymptotic_maximum_step = 0.25
+  initialization_mode = 'radial_reference'
+  restart_field_file = ''
+  initial_perturbation_amplitude = 0.0
+  initial_perturbation_radius = 3.0
+  maximum_iterations = 0
+  convergence_tolerance = 2.0e-6
+  anderson_history_limit = 10
+  anderson_progress_threshold = 0.1
+  anderson_maximum_mixing = 5.0
+  checkpoint_interval = 5
   input_output_file = 'work/normal-core-2d/input_fields_2d.dat'
   mapped_output_file = 'work/normal-core-2d/mapped_fields_2d.dat'
+  final_output_file = 'work/normal-core-2d/final_fields_2d.dat'
   metrics_file = 'work/normal-core-2d/metrics.txt'
+  history_file = 'work/normal-core-2d/iteration_history.dat'
+  checkpoint_file = 'work/normal-core-2d/checkpoint_fields_2d.dat'
 /

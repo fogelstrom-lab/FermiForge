@@ -1,0 +1,70 @@
+&legacy_double_core_map_benchmark
+  benchmark_directory = ''
+  gauss_file = 'new_src/gauss11.dat'
+  ozaki_file = 'new_src/ozaki.dat'
+  azimuth_count = 32
+  polar_count = 11
+  feedback_scale = 1.9285714285714286
+  trajectory_maximum_step = 0.25
+  minimum_substep_count = 1
+  boundary_relaxation_distance = 1.75
+  global_probe_radius = 6.0
+  asymptotic_ray_probe_count = 3
+  asymptotic_probe_file = 'work/double-core-from-scratch/asymptotic_probe_states.dat'
+  ! Held-out exterior iteration: these isolated mesh points test the
+  ! extrapolated tail without changing the production solution.
+  asymptotic_probe_iterations = 2
+  asymptotic_probe_iteration_stencil_radius = 0
+  asymptotic_probe_convergence_tolerance = 1.0e-7
+  asymptotic_probe_anderson_history_limit = 5
+  asymptotic_probe_anderson_maximum_mixing = 1.0
+  asymptotic_probe_history_file = 'work/double-core-from-scratch/asymptotic_probe_history.dat'
+  asymptotic_shadow_file = 'work/double-core-from-scratch/asymptotic_shadow_states.dat'
+  half_core_offset_x = 0.0
+  half_core_offset_y = 2.0
+  center_probe_stencil_radius = 0
+  probe_stencil_radius = 0
+  endpoint_policy = 'state_asymptotic'
+  asymptotic_bulk_gap = 0.2799
+  asymptotic_fit_inner_radius = 6.0
+  asymptotic_matching_radius = 8.0
+  asymptotic_outer_radius = 70.0
+  bulk_reference_fit_radius = 8.0
+  bulk_reference_sample_count = 64
+
+  initialization_mode = 'regularized_london'
+  scratch_mesh_kind = 'multiscale'
+  scratch_half_width = 12.0
+  scratch_number_of_cells = 48
+  scratch_fine_region_half_width = 4.0
+  scratch_medium_region_half_width = 8.0
+  scratch_fine_spacing = 0.5
+  scratch_medium_spacing = 1.0
+  scratch_coarse_spacing = 2.0
+  seed_core_width = 0.8
+  seed_domain_wall_width = 0.6
+  restart_field_file = ''
+  sparse_restart_file = ''
+  sparse_final_file = 'work/double-core-from-scratch/sparse_final_state.dat'
+
+  inactive_halo_policy = 'state_asymptotic'
+  maximum_iterations = 20
+  convergence_tolerance = 1.0e-8
+  anderson_history_limit = 10
+  anderson_progress_threshold = 0.1
+  anderson_maximum_mixing = 5.0
+  update_region = 'centered_disk'
+  update_radius = 3.0
+  update_outer_probes = .false.
+  pin_center = .false.
+  zero_mode_projection = 'gauge_translation_orientation'
+  require_convergence = .false.
+  checkpoint_interval = 1
+  checkpoint_file = 'work/double-core-from-scratch/sparse_checkpoint_state.dat'
+
+  initial_field_file = 'work/double-core-from-scratch/initial_fields_2d.dat'
+  final_field_file = 'work/double-core-from-scratch/final_fields_2d.dat'
+  history_file = 'work/double-core-from-scratch/iteration_history.dat'
+  metrics_file = 'work/double-core-from-scratch/metrics.txt'
+  sample_file = 'work/double-core-from-scratch/sampled_residuals.dat'
+/

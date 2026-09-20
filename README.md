@@ -115,13 +115,15 @@ From the project directory, run the organized ten-rank benchmark with:
 ```
 
 The runner builds the benchmark in Release mode, performs the MPI-distributed
-2D map, generates the accessible 3-by-3 order-parameter, density, and current
-figures, and archives all inputs, logs, metrics, hashes, maps, and plots under a
-collision-free timestamped directory in `runs/`. The canonical converged
-radial input and the quantitative acceptance evidence are described in
-`benchmarks/normal_core_2d/README.md`. This benchmark deliberately separates
-verification of the transport/map kernel from convergence of a future
-adaptive 2D relaxation.
+2D map, generates accessible 3-by-3 Cartesian and spherical/harmonic
+order-parameter figures together with density, current, and convergence
+figures, and archives all inputs, logs, metrics, hashes, maps, and plots under
+a collision-free timestamped directory in `runs/`. The default
+uniform input retains the historical one-map comparison. The multiscale input
+now runs a complete repeated self-consistency solve with the translated legacy
+Anderson engine and restart checkpoints. See
+`docs/RUNNING_NORMAL_CORE_2D_SOLVER.md` for the quick test, production solve,
+restart, and two-cell qcv comparison.
 
 Run the corresponding A-phase-core comparison with:
 
@@ -149,6 +151,90 @@ soft-core region, a coarse outer halo, and a circular active update region:
 
 The design, boundary policy, and path to block-structured AMR are documented
 in `docs/architecture/MULTISCALE_RECTILINEAR_MESH.md`.
+
+Run the complete two-cell normal-core comparison with:
+
+```text
+/opt/homebrew/bin/python3 tools/run_normal_core_cell_study.py
+```
+
+It converges both cells, compares each with the radial `new_src/qcv` reference,
+directly compares their common inner-grid values, and writes CSV and JSON
+acceptance reports. The supplied calculation is intentionally a long
+production run, not a smoke test.
+
+## Import a legacy full-2D state
+
+Large legacy `op_x`, `op_y`, `op_z`, and `curr` datasets are kept outside Git.
+When a local `2D_benchmarks` archive is available, inspect and convert a state
+with `import_legacy_split_field_map_2d`. The reader infers the rectilinear
+mesh, preserves all complex order-parameter and Fermi-liquid mean-field
+components, and checks the redundant norm columns. See
+`docs/IMPORTING_LEGACY_2D_FIELDS.md` for the command and the explicitly
+different legacy harmonic convention.
+
+The first nonaxisymmetric transport check uses the complete imported field for
+trajectory interpolation but maps only a configurable set of core and outer
+probe points. Run `benchmark_legacy_double_core_map_2d` with
+`examples/2d_double_core_one_map.nml`; interpretation and the initial ten-rank
+result are documented in `docs/RUNNING_DOUBLE_CORE_2D_BENCHMARK.md`.
+
+## Run the first double-core 2D continuation
+
+With the local `2D_benchmarks` archive available, the first testable staged
+continuation is one command:
+
+```text
+tools/run_first_double_core_2d.py
+```
+
+It builds the code, runs a ten-rank `0.4 -> 0.6 xi0` active-radius ladder,
+transfers sparse state between the two radii, projects gauge/translation/
+orientation tangent modes, regenerates the dependent asymptotic halo after
+each accepted update, and writes a timestamped report and plot beneath
+`runs/`. It is a two-update integration test, not a converged double-core
+solution. Detailed controls, expected values, and restart instructions are in
+`docs/RUNNING_DOUBLE_CORE_2D_BENCHMARK.md`.
+
+## Start a double-core candidate from scratch
+
+The modern solver can also generate a regularized London/two-half-core seed on
+a newly constructed multiscale mesh, with zero initial Fermi-liquid mean field:
+
+```text
+tools/run_double_core_from_scratch.py
+```
+
+This path reads no archived 2D field. It begins MPI/Anderson iteration, writes
+restartable state and machine-readable metrics, and produces the Cartesian,
+harmonic, density/current, convergence, and symmetry-axis order-parameter
+plots. The ordinary command now requests up to 20 updates and writes a sparse
+restart checkpoint after every completed update; use `--iterations 2` for the
+short integration test. Reaching the iteration limit is not the same as a
+converged vortex. The seed equations, verified result, restart command, and
+escalation path are documented in
+`docs/RUNNING_DOUBLE_CORE_FROM_SCRATCH.md`.
+
+For the first larger branch-stability calculation, use
+`caffeinate -i tools/run_double_core_overnight.py`. This preset expands the
+cell to `+/-40 xi0`, resolves the central region at `0.4 xi0`, relaxes a disk
+of radius `22 xi0`, and starts the hard cores at `y=+/-10 xi0`. It records the
+measured half-core separation after every update so collapse toward a
+single-core state is visible during the run.
+
+After that run, `caffeinate -i tools/run_double_core_adaptive_domain.py`
+measures directional interface and boundary-collar diagnostics, enlarges only
+the failing axes, and stops when the calculated state is contained. The
+selected extent therefore responds to temperature and Fermi-liquid parameters
+instead of using prescribed physical radii. Restart and diagnostic controls
+are in
+`docs/RUNNING_DOUBLE_CORE_FROM_SCRATCH.md`.
+
+The original `nop`, `aop`, and `dop` initialization formulas are also
+available as `historical_nop`, `historical_aop`, and `historical_dop`. The
+large controlled comparison with the historical double-core seed is
+`caffeinate -i tools/run_historical_dop_overnight.py`; see
+`docs/HISTORICAL_CORE_SEEDS.md` for the exact conventions.
 
 ## Build and test
 
@@ -186,28 +272,31 @@ export DEVELOPER_DIR=/Library/Developer/CommandLineTools
 
 ## Version control and upload
 
-Generated builds, local run archives, plots, executables, and compiler products
-are excluded by `.gitignore`. Source, documentation, benchmark definitions,
-compact comparison reports, legacy reference inputs, and intentionally named
+Generated builds, local run archives, plots, executables, compiler products,
+and LaTeX intermediates are excluded by `.gitignore`. Source documentation is
+tracked together with the canonical rendered PDF under `output/pdf`; transient
+PDFs beside the LaTeX source are not tracked. Benchmark definitions, compact
+comparison reports, legacy reference inputs, and intentionally named
 historical datasets remain trackable.
 
-The guarded upload helper runs the strict CMake/CTest suite, previews and
-stages changes, rejects individual files larger than 25 MiB, asks for final
+The guarded upload helper requires the MPI execution layer, runs the strict
+CMake/CTest suite, validates the maintained Python tools, previews and stages
+changes, rejects individual files larger than 25 MiB, asks for final
 confirmation, commits, checks the remote branch for fast-forward ancestry,
 and pushes without ever using a force option. Its default destination is the
-canonical FermiForge GitHub repository:
+canonical FermiForge GitHub repository. The portable top-level shortcut is:
 
 ```text
-tools/upload_to_git.sh -m "Initial FermiForge import"
+./push_to_github.sh -m "Describe this reviewed change"
 ```
 
 Use HTTPS instead of SSH if that is how GitHub authentication is configured:
 
 ```text
-tools/upload_to_git.sh --https -m "Initial FermiForge import"
+./push_to_github.sh --https -m "Describe this reviewed change"
 ```
 
-After `origin` has been configured, subsequent uploads need only a message:
+The maintained implementation can also be called directly:
 
 ```text
 tools/upload_to_git.sh -m "Describe this reviewed change"
@@ -216,7 +305,9 @@ tools/upload_to_git.sh -m "Describe this reviewed change"
 Once a local Git repository exists, use `--dry-run` to run verification and
 preview changes without staging, committing, or contacting the remote. The
 script stops rather than guessing if the remote already contains unrelated
-commits.
+commits, and reports explicitly whether a local commit was created before any
+failure. `--allow-no-mpi` permits an intentionally reduced test build, but it
+should not be used for the normal FermiForge publication gate.
 
 ## Run and plot the cylindrical reference
 

@@ -184,7 +184,7 @@ contains
 
   subroutine update_mpi_he3_state_with_anderson( &
       communicator, mesh, accelerator, current, mapped, tolerance, next, &
-      anderson_report, residual_report)
+      anderson_report, residual_report, active_point_mask)
     type(MPI_Comm), intent(in) :: communicator
     type(cartesian_mesh_2d_t), intent(in) :: mesh
     type(legacy_anderson_t), intent(inout) :: accelerator
@@ -193,6 +193,7 @@ contains
     type(spinful_state_2d_t), intent(out) :: next
     type(anderson_report_t), intent(out) :: anderson_report
     type(he3_field_residual_report_t), intent(out) :: residual_report
+    logical, intent(in), optional :: active_point_mask(:)
 
     integer :: anderson_integers(4), ierr, rank, residual_integers(2)
     real(rk) :: anderson_reals(4), residual_reals(6)
@@ -200,9 +201,15 @@ contains
     call MPI_Comm_rank(communicator, rank, ierr)
     call require_mpi_success(ierr, "could not obtain Anderson MPI rank")
     if (rank == 0) then
-      call update_he3_state_with_anderson( &
-        mesh, accelerator, current, mapped, tolerance, next, &
-        anderson_report, residual_report)
+      if (present(active_point_mask)) then
+        call update_he3_state_with_anderson( &
+          mesh, accelerator, current, mapped, tolerance, next, &
+          anderson_report, residual_report, active_point_mask)
+      else
+        call update_he3_state_with_anderson( &
+          mesh, accelerator, current, mapped, tolerance, next, &
+          anderson_report, residual_report)
+      end if
       anderson_integers = [anderson_report%iteration, &
         anderson_report%history_size, anderson_report%discarded_vectors, &
         merge(1, 0, anderson_report%converged) + &

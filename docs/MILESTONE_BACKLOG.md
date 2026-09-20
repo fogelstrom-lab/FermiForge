@@ -14,7 +14,7 @@ this file defines the next reviewable pieces of work. Status values are
 | G0-04 | ready | Converged legacy specular-cylinder A-core reference | G0-03 | Same controls as free case; core and surface convergence recorded |
 | G0-05 | ready | Boundary-strategy interface in radial code | C-01 | Explicit free-asymptotic and specular-cylinder implementations; no hidden `cyl` global branch |
 | G0-06 | blocked | `new_src` free/cylinder field regression | G0-03, G0-04, G0-05 | Comparison report for all complex fields and current-related fields |
-| G0-07 | ready | Solver terminal status and machine-readable residual log | G0-01 | Distinguishes converged, iteration limit, invalid state, and interruption |
+| G0-07 | active | Solver terminal status and machine-readable residual log | G0-01 | 2D driver distinguishes converged, iteration limit, and map failure with per-map residual/Anderson logs; interruption handling remains |
 | G0-08 | done | Converged current-`new_src` free normal-core reference | G0-01 | 100-point tangent grid; final average/max residuals `5.130e-9`/`1.562e-6`; exact input, history, fields, hashes, and status archived |
 | G0-09 | done | Converged current-`new_src` free A-phase-core reference | G0-01 | Consistent 100-point tangent fields archived; zero-iteration restart provenance recorded; independent original/modern point maps agree to `1.20e-4` relative gap error |
 | C-01 | active | Freeze mathematical conventions | draft note | Resolve unit, tilde, propagator-normalization, and code-basis questions; approve tests |
@@ -24,10 +24,10 @@ this file defines the next reviewable pieces of work. Status values are
 | M1-02 | done | Side-effect-free legacy Riccati kernel | C-01, M1-01 | Frozen forward/reverse trajectory agrees with `new_src` at every integration checkpoint |
 | M1-03 | active | 2 by 2 spin-matrix Riccati kernel | M1-02 | Scalar limit, source normalization, coefficient conversion, conjugate coherence, and spin rotation pass; general tilde/particle-hole convention still open |
 | M1-04 | active | Unbounded 2D trajectory sampler | M1-01, M1-03 | Selectable free-vortex continuation, source tail powers, boundary continuity, uniform-bulk invariance, and serial/MPI tests pass; outer-radius/domain/step convergence remains |
-| M1-05 | active | 2D 3He self-consistency map | A-02, M1-04 | Full-grid serial/MPI map, spatial residual diagnostics, packing, Anderson adapter, and free-vortex endpoint pass; converged axial 2D regression remains |
-| M1-06 | active | Embedded normal-core and A-core 2D regression | G0-08, G0-09, M1-05 | Both independent point oracles and uniform-grid map residuals recorded; field tolerances remain to be met under multiscale mesh/endpoint/step/rank refinement |
+| M1-05 | active | 2D 3He self-consistency map | A-02, M1-04 | Repeated MPI map, legacy Anderson update, convergence history, checkpoints, and coordinate-checked restart pass; production axial convergence remains |
+| M1-06 | active | Embedded normal-core and A-core 2D regression | G0-08, G0-09, M1-05 | Point oracles and map residuals pass; normal-core two-cell converged workflow is implemented and awaits production acceptance, then the A-core repeat |
 | M1-07 | done | Static multiscale rectilinear mesh and circular active region | M1-06 | Fine/medium/coarse coordinates, nonuniform Q1 lookup, active-only MPI mapping, frozen halo, masked/zonal residuals, normal/A-core maps, and strict tests pass |
-| M2-01 | deferred | Double-core seeds and gauge/orientation constraints | M1-06 | London and perturbed-axial seeds; only zero modes pinned |
+| M2-01 | active | Double-core reference, seeds, and gauge/orientation constraints | M1-06 | Imported-field continuation and a regularized London/two-half-core scratch seed both iterate through the MPI/Anderson path; an independent axial-vortex symmetry-breaking seed, physical index-rotation review, progressive release of the inactive inner annulus, and converged larger-radius escalation remain |
 | M2-02 | deferred | Temperature/domain/resolution continuation | M2-01 | Stable two-half-core solution from at least two seed paths |
 | M2-03 | deferred | `a`, `C1`, `C2`, pair density, current diagnostics | M2-02 | Automated asymptotic windows and uncertainty from convergence studies |
 | M2-04 | active | First MPI batching/scaling report | M1-05 | Point batching is identical for 1/4/10 ranks with preliminary timing; production-size compute/reduction/interpolation/I/O report remains |

@@ -1,0 +1,73 @@
+&legacy_double_core_map_benchmark
+  benchmark_directory = ''
+  gauss_file = 'new_src/gauss11.dat'
+  ozaki_file = 'new_src/ozaki.dat'
+  azimuth_count = 32
+  polar_count = 11
+  feedback_scale = 1.9285714285714286
+  trajectory_maximum_step = 0.25
+  minimum_substep_count = 1
+  boundary_relaxation_distance = 1.75
+
+  ! These are diagnostic probe positions for the historical seed; dop itself
+  ! does not prescribe separated half cores.
+  global_probe_radius = 20.0
+  asymptotic_ray_probe_count = 8
+  asymptotic_probe_file = 'work/historical-dop-overnight/asymptotic_probe_states.dat'
+  asymptotic_probe_iterations = 12
+  asymptotic_probe_iteration_stencil_radius = 0
+  asymptotic_probe_convergence_tolerance = 1.0e-7
+  asymptotic_probe_anderson_history_limit = 5
+  asymptotic_probe_anderson_maximum_mixing = 1.0
+  asymptotic_probe_history_file = 'work/historical-dop-overnight/asymptotic_probe_history.dat'
+  asymptotic_shadow_file = 'work/historical-dop-overnight/asymptotic_shadow_states.dat'
+  half_core_offset_x = 0.0
+  half_core_offset_y = 10.0
+  center_probe_stencil_radius = 0
+  probe_stencil_radius = 0
+
+  endpoint_policy = 'state_asymptotic'
+  asymptotic_bulk_gap = 0.2799
+  asymptotic_fit_inner_radius = 26.0
+  asymptotic_matching_radius = 32.0
+  asymptotic_outer_radius = 90.0
+  bulk_reference_fit_radius = 32.0
+  bulk_reference_sample_count = 128
+
+  initialization_mode = 'historical_dop'
+  seed_reduced_temperature = 0.30
+  scratch_mesh_kind = 'multiscale'
+  scratch_half_width = 40.0
+  scratch_number_of_cells = 160
+  scratch_fine_region_half_width = 14.0
+  scratch_medium_region_half_width = 28.0
+  scratch_fine_spacing = 0.4
+  scratch_medium_spacing = 0.8
+  scratch_coarse_spacing = 2.0
+  seed_core_width = 0.8
+  seed_domain_wall_width = 0.6
+  restart_field_file = ''
+  sparse_restart_file = ''
+  sparse_final_file = 'work/historical-dop-overnight/sparse_final_state.dat'
+
+  inactive_halo_policy = 'state_asymptotic'
+  maximum_iterations = 20
+  convergence_tolerance = 1.0e-8
+  anderson_history_limit = 10
+  anderson_progress_threshold = 0.1
+  anderson_maximum_mixing = 5.0
+  update_region = 'centered_disk'
+  update_radius = 22.0
+  update_outer_probes = .false.
+  pin_center = .false.
+  zero_mode_projection = 'gauge_translation_orientation'
+  require_convergence = .false.
+  checkpoint_interval = 1
+  checkpoint_file = 'work/historical-dop-overnight/sparse_checkpoint_state.dat'
+
+  initial_field_file = 'work/historical-dop-overnight/initial_fields_2d.dat'
+  final_field_file = 'work/historical-dop-overnight/final_fields_2d.dat'
+  history_file = 'work/historical-dop-overnight/iteration_history.dat'
+  metrics_file = 'work/historical-dop-overnight/metrics.txt'
+  sample_file = 'work/historical-dop-overnight/sampled_residuals.dat'
+/

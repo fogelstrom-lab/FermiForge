@@ -19,6 +19,11 @@ The full-grid residual is a convergence-study metric, not yet a production
 tolerance. In particular, the uniform 17 by 17 baseline cannot be expected to
 resolve the coherence-length structure and the extended soft core at once.
 
+The strict test suite also contains a deliberately small
+`2d_a_phase_core_asymptotic_smoke.nml` case. It checks the complete ten-rank
+endpoint/halo path quickly; its fit radii are too close to the core for use as
+a quantitative asymptotic result.
+
 ## Reference
 
 The preserved reference is under
@@ -52,7 +57,7 @@ The first multiscale comparison is run with:
 ```text
 /opt/homebrew/bin/python3 tools/run_axisymmetric_core_benchmark.py \
   --input examples/2d_a_phase_core_multiscale.nml \
-  --case-name a-phase-core-multiscale \
+  --case-name a-phase-core-asymptotic \
   --initialization converged-radial-reference \
   --ranks 10
 ```
@@ -60,6 +65,18 @@ The first multiscale comparison is run with:
 This mesh has a fine core region, an intermediate soft-core region, a coarse
 trajectory halo, and a circular active update mask. Residuals are reported by
 zone so the soft core cannot be hidden by the larger outer field.
+
+This input now exercises the first explicit asymptotic continuation. It fits
+the full order-parameter matrix and current-related Fermi-liquid mean field at
+`7 xi0` and `9 xi0`, retains independent `1/r` and `1/r^2` coefficients, and
+regenerates the 196 inactive halo nodes from that fit. The trajectory endpoint
+uses the same expansion out to `70 xi0`. The fit is sourced from the converged
+radial A-core profile so its error can be measured directly before the same
+machinery is driven by a nonaxisymmetric 2D iterate.
+
+The supplied input performs one map (`maximum_iterations=0`). After inspecting
+its halo errors, request a self-consistent run without editing the file by
+adding `--max-iterations 60 --tolerance 2e-6` to the command above.
 
 ## Next convergence gate
 

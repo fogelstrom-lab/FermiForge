@@ -40,8 +40,8 @@ region surrounded by a fixed radial-reference halo inside the rectangular
 storage mesh.
 
 This is a benchmark boundary policy, not a general container boundary
-condition. A future nonaxisymmetric calculation must replace the radial halo
-with a controlled asymptotic, material, or domain-decomposition policy.
+condition. The nonaxisymmetric free-vortex calculation will replace the fixed
+radial halo with the angle-dependent asymptotic continuation described below.
 
 Inactive nodes have exactly zero nonlinear residual. Residual reports can take
 an active mask, and the benchmark additionally reports fine-, medium-, and
@@ -70,12 +70,70 @@ are zero. Any later mesh change invalidates both cached stencils and Anderson
 history; fields must be transferred and the accelerator reset before
 restarting the solve.
 
+## Angle-dependent asymptotic exterior
+
+For a free nonaxisymmetric vortex, points outside the self-consistent matching
+surface do not remain frozen. Following the double-core calculation, the
+order parameter will be continued as
+
+```text
+A(r,phi) = A0(phi)
+         + A1(phi) (Rc/r)
+         + A2(phi) (Rc/r)^2 + O(r^-3),
+```
+
+The coefficient functions are evaluated independently at each spatial azimuth.
+Equation (20) of `dcvlong` fixes their Cartesian block structure: `A1` has
+only the mixed z/in-plane entries, while `A2` has the in-plane 2 by 2 block
+and the zz entry. Thus each order-parameter component has one allowed leading
+power, not a fitted mixture of both. The functions are not restricted to the
+two-constant hydrostatic `C1,C2` form. The Fermi-liquid current-related mean
+field has the corresponding, unrestricted large-distance form
+
+```text
+nu(r,phi) = nu1(phi) (Rc/r) + nu2(phi) (Rc/r)^2 + O(r^-3).
+```
+
+Equivalently, the factors of `Rc` may be absorbed into coefficients multiplying
+`1/r` and `1/r^2`. The order parameter is matched continuously at `Rc` using
+the single power permitted for each block. The mean field is sampled at two
+radii, `Rin` and `Rc`, and both coefficients are solved independently for all
+three real components. This retains the slow A-core channels without imposing
+axial symmetry on a future double-core state.
+
+The endpoint has two source modes. The radial-reference mode extracts the
+coefficients from a converged `new_src` profile and is the controlled normal-
+and A-core validation path. The state-fit mode extracts them from the current
+2D field at the same polar angle; its regression test uses different
+coefficients at `phi=0` and `phi=pi`. The latter is the mechanism intended for
+nonaxisymmetric iteration.
+
+For an anisotropic active domain, `Rin(phi)` and `Rc(phi)` are radial
+intersections with two nested ellipses. Both surfaces lie a configurable
+number of local mesh intervals inside the active ellipse. This keeps every
+interpolation stencil in the self-consistently updated region. A circular
+special case remains available for axisymmetric calculations.
+
+The outer nodes are dependent asymptotic values rather than independent
+Anderson unknowns. After each accepted update and before the next trajectory
+map, the benchmark regenerates every node outside the active ellipse from the
+fitted expansion. The current axisymmetric
+validation deliberately refits the preserved radial solution; switching the
+driver to the state-fit source will regenerate the coefficients from each new
+interior iterate for the double core.
+
+Two-radius interpolation is the minimum identifiable fit for the Fermi-liquid
+field and makes continuity easy to test. It should eventually be upgraded to
+an overdetermined annular least-squares fit with radial-window and angular
+resolution diagnostics; the Eq. (20) order-parameter block constraints must
+remain explicit in that upgrade.
+
 ## Initial benchmark
 
 The first normal- and A-phase-core runs use a square halo of half-width 12,
 zone boundaries at radii 3 and 7, target spacings 0.5, 1.0, and 2.5, and a
 circular active radius of 9. There are 625 stored nodes, of which 429 are
-active and 196 form the frozen halo.
+active and 196 form the dependent asymptotic halo in the A-core test.
 
 For the A-phase core the one-map relative L2 residuals are approximately
 `7.62e-3`, `1.21e-2`, and `1.09e-2` in the fine, medium, and outer active

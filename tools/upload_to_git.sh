@@ -13,10 +13,31 @@ branch="${default_branch}"
 remote_url="${FERMIFORGE_REMOTE_URL:-${default_remote_url}}"
 commit_message=""
 run_tests=true
+require_mpi=true
 push_changes=true
 dry_run=false
 replace_remote=false
 assume_yes=false
+new_commit_created=false
+
+report_failed_upload() {
+  local status=$?
+  if ((status == 0)); then
+    return
+  fi
+
+  printf '\nUpload script stopped with status %s.\n' "${status}" >&2
+  if "${new_commit_created}"; then
+    printf 'A local commit was created, but the remote push did not complete: %s\n' \
+      "$(git rev-parse --short HEAD 2>/dev/null || printf unknown)" >&2
+  else
+    printf 'No new commit or push was completed; any staged changes remain intact.\n' >&2
+  fi
+  trap - EXIT
+  exit "${status}"
+}
+
+trap report_failed_upload EXIT
 
 usage() {
   cat <<'EOF'
@@ -34,7 +55,8 @@ Options:
       --https              Use the GitHub HTTPS URL instead of SSH.
       --replace-remote     Replace an existing origin with --remote-url.
       --branch NAME        Branch to upload (default: main).
-      --skip-tests         Do not run the CMake/CTest verification gate.
+      --skip-tests         Do not run the Fortran/MPI/Python verification gate.
+      --allow-no-mpi       Permit a deliberately reduced non-MPI test build.
       --no-push            Commit locally but do not contact or push the remote.
       --dry-run            Run checks and preview files; do not stage or commit.
   -y, --yes                Do not ask for final interactive confirmation.
@@ -87,6 +109,10 @@ while (($# > 0)); do
       ;;
     --skip-tests)
       run_tests=false
+      shift
+      ;;
+    --allow-no-mpi)
+      require_mpi=false
       shift
       ;;
     --no-push)
@@ -145,10 +171,21 @@ fi
 if "${run_tests}"; then
   compiler="${FERMIFORGE_FC:-}"
   if [[ -z "${compiler}" ]]; then
-    for candidate in "$(command -v gfortran 2>/dev/null || true)" \
-                     /opt/homebrew/bin/gfortran \
-                     /opt/local/bin/gfortran \
-                     /usr/local/bin/gfortran; do
+    compiler_candidates=(
+      "$(command -v gfortran 2>/dev/null || true)"
+      /opt/homebrew/bin/gfortran
+      /opt/local/bin/gfortran
+      /usr/local/bin/gfortran
+    )
+    if "${require_mpi}"; then
+      compiler_candidates+=(
+        "$(command -v mpifort 2>/dev/null || true)"
+        /opt/homebrew/bin/mpifort
+        /opt/local/bin/mpifort
+        /usr/local/bin/mpifort
+      )
+    fi
+    for candidate in "${compiler_candidates[@]}"; do
       if [[ -n "${candidate}" && -x "${candidate}" ]]; then
         compiler="${candidate}"
         break
@@ -157,6 +194,16 @@ if "${run_tests}"; then
   fi
   [[ -n "${compiler}" ]] || \
     fail "no GNU Fortran compiler found; set FERMIFORGE_FC or use --skip-tests"
+  if [[ "${compiler}" != */* ]]; then
+    compiler="$(command -v "${compiler}" 2>/dev/null || true)"
+  fi
+  [[ -n "${compiler}" && -x "${compiler}" ]] || \
+    fail "Fortran compiler is not executable; set FERMIFORGE_FC to its full path"
+
+  # Homebrew compiler wrappers name their backend without an absolute path.
+  # Ensure a fallback compiler selected outside the login PATH remains visible
+  # to FindMPI and to mpifort/mpif90 during CMake's feature checks.
+  export PATH="$(cd "$(dirname "${compiler}")" && pwd):${PATH}"
 
   if [[ -z "${DEVELOPER_DIR:-}" && -d /Library/Developer/CommandLineTools ]]; then
     export DEVELOPER_DIR=/Library/Developer/CommandLineTools
@@ -164,14 +211,26 @@ if "${run_tests}"; then
 
   build_directory="${project_root}/work/git-upload-check"
   strict_flags="-Wall -Wextra -Wimplicit-interface -Wconversion-extra -fcheck=all -ffpe-trap=invalid,zero,overflow -fbacktrace"
+  cmake_require_mpi=OFF
+  if "${require_mpi}"; then
+    cmake_require_mpi=ON
+  fi
   printf 'Running FermiForge verification with %s\n' "${compiler}"
   cmake -S "${project_root}" -B "${build_directory}" \
     -DCMAKE_BUILD_TYPE=Debug \
     -DCMAKE_Fortran_COMPILER="${compiler}" \
-    -DCMAKE_Fortran_FLAGS="${strict_flags}"
+    -DCMAKE_Fortran_FLAGS="${strict_flags}" \
+    -DFERMIFORGE_ENABLE_MPI=ON \
+    -DFERMIFORGE_REQUIRE_MPI="${cmake_require_mpi}"
   cmake --build "${build_directory}" \
     --parallel "${FERMIFORGE_BUILD_JOBS:-10}"
   ctest --test-dir "${build_directory}" --output-on-failure
+
+  python_interpreter="$(command -v python3 2>/dev/null || true)"
+  [[ -n "${python_interpreter}" ]] || \
+    fail "python3 is required to validate the maintained runner and plot tools"
+  "${python_interpreter}" -c \
+    'import ast, pathlib; files = sorted(pathlib.Path("tools").glob("*.py")); [ast.parse(path.read_text(encoding="utf-8"), filename=str(path)) for path in files]; print(f"Validated Python syntax for {len(files)} maintained tools")'
 fi
 
 printf '\nGit working-tree preview:\n'
@@ -188,10 +247,12 @@ git add -A
 # Preserve legacy fixed-form source and numerical reference files byte for byte.
 # Apply Git's whitespace-error gate to the maintained source and documentation,
 # while excluding imported historical snapshots and benchmark reference data.
-git diff --cached --check -- . \
-  ':(exclude)incoming/**' \
-  ':(exclude)new_src/**' \
-  ':(exclude)benchmarks/**/reference/**'
+if ! git diff --cached --check -- . \
+    ':(exclude)incoming/**' \
+    ':(exclude)new_src/**' \
+    ':(exclude)benchmarks/**/reference/**'; then
+  fail "staged whitespace validation failed; nothing was committed or pushed"
+fi
 
 staged_file_is_too_large=false
 while IFS= read -r -d '' path; do
@@ -243,6 +304,8 @@ if ! git diff --cached --quiet; then
     commit_message="FermiForge update $(date '+%Y-%m-%d %H:%M %Z')"
   fi
   git commit -m "${commit_message}"
+  new_commit_created=true
+  printf 'Created local commit %s\n' "$(git rev-parse --short HEAD)"
 else
   printf 'No staged changes; no new commit was created.\n'
 fi
@@ -283,5 +346,5 @@ if git ls-remote --exit-code --heads "${remote_name}" \
 fi
 
 git push --set-upstream "${remote_name}" "${branch}"
-printf 'Uploaded %s to %s without rewriting remote history.\n' \
-  "${branch}" "${configured_url}"
+printf 'Uploaded %s at commit %s to %s without rewriting remote history.\n' \
+  "${branch}" "$(git rev-parse --short HEAD)" "${configured_url}"

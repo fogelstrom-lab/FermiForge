@@ -11,7 +11,8 @@ program test_he3_field_map_2d
   use he3_field_map_2d, only : he3_field_map_diagnostics_t, &
                                evaluate_serial_he3_field_map
   use new_src_iteration_layout_2d, only : &
-    new_src_iteration_vector_size_2d
+    new_src_iteration_vector_size_2d, &
+    new_src_masked_iteration_vector_size_2d
   use legacy_anderson_mixing, only : legacy_anderson_t, anderson_report_t
   use he3_nonlinear_iteration_2d, only : he3_field_residual_report_t, &
                                          compute_he3_field_residual, &
@@ -155,6 +156,29 @@ contains
     call require(anderson_report%iteration == 1 .and. &
                  anderson_report%history_size == 1, &
                  "field Anderson adapter returned the wrong state")
+
+    call accelerator%initialize( &
+      new_src_masked_iteration_vector_size_2d(current, active_point), &
+      5, 0.1_rk, 5.0_rk)
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, active_point)
+    expected = current
+    expected%order_parameter(:, :, 2) = &
+      current%order_parameter(:, :, 2) + cmplx(0.01_rk, 0.0_rk, rk) * &
+      (mapped%order_parameter(:, :, 2) - &
+       current%order_parameter(:, :, 2))
+    expected%current_mean_field(:, 2) = &
+      current%current_mean_field(:, 2) + 0.01_rk * &
+      (mapped%current_mean_field(:, 2) - &
+       current%current_mean_field(:, 2))
+    call require(residual_report%value_count == 21, &
+      "masked Anderson residual used the wrong vector length")
+    call require(maxval(abs(next%order_parameter - &
+                                expected%order_parameter)) < 2.0e-15_rk .and. &
+                 maxval(abs(next%current_mean_field - &
+                                expected%current_mean_field)) < 2.0e-15_rk, &
+      "masked Anderson update changed a frozen point")
   end subroutine test_residual_and_anderson_adapter
 
 

@@ -5,9 +5,65 @@ module spinful_field_io_2d
   implicit none
   private
 
+  public :: read_spinful_field_map_2d
   public :: write_spinful_field_map_2d
 
 contains
+
+  subroutine read_spinful_field_map_2d(path, mesh, state)
+    character(len=*), intent(in) :: path
+    type(cartesian_mesh_2d_t), intent(in) :: mesh
+    type(spinful_state_2d_t), intent(inout) :: state
+
+    character(len=2048) :: line, message
+    real(rk) :: row(24), tolerance, expected_x, expected_y
+    integer :: component, ios, orbital, point, position, spin, unit
+    integer :: x_node, y_node
+
+    if (.not. state%is_valid_for(mesh)) &
+      error stop "cannot read a 2D field into a state that does not match its mesh"
+    open(newunit=unit, file=trim(path), status="old", action="read", &
+         iostat=ios, iomsg=message)
+    if (ios /= 0) error stop "cannot open 2D field input: " // trim(message)
+
+    point = 0
+    do
+      read(unit, '(a)', iostat=ios, iomsg=message) line
+      if (ios < 0) exit
+      if (ios > 0) error stop "cannot read 2D field input: " // trim(message)
+      if (len_trim(line) == 0 .or. line(1:1) == "#") cycle
+      point = point + 1
+      if (point > mesh%point_count()) &
+        error stop "2D field input contains too many points"
+      read(line, *, iostat=ios, iomsg=message) row
+      if (ios /= 0) error stop "invalid 2D field record: " // trim(message)
+
+      x_node = modulo(point - 1, mesh%x_point_count())
+      y_node = (point - 1) / mesh%x_point_count()
+      expected_x = mesh%x_coordinate(x_node)
+      expected_y = mesh%y_coordinate(y_node)
+      tolerance = 128.0_rk * epsilon(1.0_rk) * &
+        max(1.0_rk, abs(expected_x), abs(expected_y))
+      if (abs(row(1) - expected_x) > tolerance .or. &
+          abs(row(2) - expected_y) > tolerance) &
+        error stop "2D field input coordinates do not match the requested mesh"
+
+      position = 2
+      do spin = 1, 3
+        do orbital = 1, 3
+          state%order_parameter(spin, orbital, point) = &
+            cmplx(row(position + 1), row(position + 2), kind=rk)
+          position = position + 2
+        end do
+      end do
+      do component = 1, 3
+        state%current_mean_field(component, point) = row(21 + component)
+      end do
+    end do
+    close(unit)
+    if (point /= mesh%point_count()) &
+      error stop "2D field input contains the wrong number of points"
+  end subroutine read_spinful_field_map_2d
 
   subroutine write_spinful_field_map_2d( &
       path, mesh, state, source_label, endpoint_policy)

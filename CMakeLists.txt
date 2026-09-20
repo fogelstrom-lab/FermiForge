@@ -5,6 +5,16 @@ project(FermiForge LANGUAGES Fortran)
 include(CTest)
 
 option(FERMIFORGE_ENABLE_MPI "Build the MPI field-map execution layer" ON)
+option(FERMIFORGE_REQUIRE_MPI
+  "Fail configuration when the requested MPI field-map layer is unavailable"
+  OFF
+)
+
+if(FERMIFORGE_REQUIRE_MPI AND NOT FERMIFORGE_ENABLE_MPI)
+  message(FATAL_ERROR
+    "FERMIFORGE_REQUIRE_MPI=ON requires FERMIFORGE_ENABLE_MPI=ON"
+  )
+endif()
 
 add_library(he3_mesh
   src/he3_kinds.f90
@@ -16,6 +26,11 @@ add_library(he3_mesh
   src/cartesian_mesh_2d.f90
   src/spinful_state_2d.f90
   src/spinful_field_io_2d.f90
+  src/spinful_sparse_state_io_2d.f90
+  src/legacy_split_field_io_2d.f90
+  src/double_core_seed_2d.f90
+  src/historical_core_seed_2d.f90
+  src/spinful_tangent_projection_2d.f90
   src/bilinear_field_sampler_2d.f90
   src/straight_trajectory_2d.f90
   src/trajectory_self_energy_2d.f90
@@ -57,6 +72,16 @@ set_target_properties(compare_radial_point_map PROPERTIES
   Fortran_EXTENSIONS NO
 )
 
+add_executable(import_legacy_split_field_map_2d
+  app/import_legacy_split_field_map_2d.f90
+)
+target_link_libraries(import_legacy_split_field_map_2d PRIVATE he3_mesh)
+set_target_properties(import_legacy_split_field_map_2d PROPERTIES
+  Fortran_STANDARD 2018
+  Fortran_STANDARD_REQUIRED YES
+  Fortran_EXTENSIONS NO
+)
+
 if(FERMIFORGE_ENABLE_MPI)
   find_package(MPI COMPONENTS Fortran QUIET)
   if(MPI_Fortran_FOUND)
@@ -87,6 +112,28 @@ if(FERMIFORGE_ENABLE_MPI)
       Fortran_STANDARD_REQUIRED YES
       Fortran_EXTENSIONS NO
     )
+    add_executable(benchmark_legacy_double_core_map_2d
+      app/benchmark_legacy_double_core_map_2d.f90
+    )
+    target_link_libraries(benchmark_legacy_double_core_map_2d
+      PRIVATE he3_mpi_execution
+    )
+    set_target_properties(benchmark_legacy_double_core_map_2d PROPERTIES
+      Fortran_STANDARD 2018
+      Fortran_STANDARD_REQUIRED YES
+      Fortran_EXTENSIONS NO
+    )
+    add_executable(fermiforge_double_core_2d
+      app/benchmark_legacy_double_core_map_2d.f90
+    )
+    target_link_libraries(fermiforge_double_core_2d
+      PRIVATE he3_mpi_execution
+    )
+    set_target_properties(fermiforge_double_core_2d PROPERTIES
+      Fortran_STANDARD 2018
+      Fortran_STANDARD_REQUIRED YES
+      Fortran_EXTENSIONS NO
+    )
     set(FERMIFORGE_MPI_1_LOCAL_FLAGS)
     set(FERMIFORGE_MPI_4_LOCAL_FLAGS)
     set(FERMIFORGE_MPI_10_LOCAL_FLAGS)
@@ -109,7 +156,14 @@ if(FERMIFORGE_ENABLE_MPI)
       endif()
     endif()
   else()
-    message(STATUS "MPI Fortran not found; MPI field-map layer is disabled")
+    if(FERMIFORGE_REQUIRE_MPI)
+      message(FATAL_ERROR
+        "MPI Fortran is required but was not found. Install/configure MPI "
+        "or set FERMIFORGE_REQUIRE_MPI=OFF deliberately."
+      )
+    else()
+      message(STATUS "MPI Fortran not found; MPI field-map layer is disabled")
+    endif()
   endif()
 endif()
 
@@ -153,6 +207,75 @@ if(BUILD_TESTING)
     Fortran_EXTENSIONS NO
   )
   add_test(NAME cartesian_field_2d COMMAND test_cartesian_field_2d)
+
+  add_executable(test_spinful_field_io_2d
+    tests/test_spinful_field_io_2d.f90
+  )
+  target_link_libraries(test_spinful_field_io_2d PRIVATE he3_mesh)
+  set_target_properties(test_spinful_field_io_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME spinful_field_io_2d COMMAND test_spinful_field_io_2d)
+
+  add_executable(test_spinful_sparse_state_io_2d
+    tests/test_spinful_sparse_state_io_2d.f90
+  )
+  target_link_libraries(test_spinful_sparse_state_io_2d PRIVATE he3_mesh)
+  set_target_properties(test_spinful_sparse_state_io_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME spinful_sparse_state_io_2d
+           COMMAND test_spinful_sparse_state_io_2d)
+
+  add_executable(test_spinful_tangent_projection_2d
+    tests/test_spinful_tangent_projection_2d.f90
+  )
+  target_link_libraries(test_spinful_tangent_projection_2d PRIVATE he3_mesh)
+  set_target_properties(test_spinful_tangent_projection_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME spinful_tangent_projection_2d
+           COMMAND test_spinful_tangent_projection_2d)
+
+  add_executable(test_legacy_split_field_io_2d
+    tests/test_legacy_split_field_io_2d.f90
+  )
+  target_link_libraries(test_legacy_split_field_io_2d PRIVATE he3_mesh)
+  set_target_properties(test_legacy_split_field_io_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME legacy_split_field_io_2d
+           COMMAND test_legacy_split_field_io_2d)
+
+  add_executable(test_double_core_seed_2d
+    tests/test_double_core_seed_2d.f90
+  )
+  target_link_libraries(test_double_core_seed_2d PRIVATE he3_mesh)
+  set_target_properties(test_double_core_seed_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME double_core_seed_2d COMMAND test_double_core_seed_2d)
+
+  add_executable(test_historical_core_seed_2d
+    tests/test_historical_core_seed_2d.f90
+  )
+  target_link_libraries(test_historical_core_seed_2d PRIVATE he3_mesh)
+  set_target_properties(test_historical_core_seed_2d PROPERTIES
+    Fortran_STANDARD 2018
+    Fortran_STANDARD_REQUIRED YES
+    Fortran_EXTENSIONS NO
+  )
+  add_test(NAME historical_core_seed_2d COMMAND test_historical_core_seed_2d)
 
   add_executable(test_order_parameter_basis
     tests/test_order_parameter_basis.f90
@@ -365,6 +488,42 @@ if(BUILD_TESTING)
     )
     set_tests_properties(
       he3_mpi_field_map_10_ranks PROPERTIES PROCESSORS 10
+    )
+    add_test(
+      NAME normal_core_2d_solver_smoke
+      COMMAND ${MPIEXEC_EXECUTABLE} ${FERMIFORGE_MPI_10_LOCAL_FLAGS}
+              ${MPIEXEC_NUMPROC_FLAG} 10
+              ${MPIEXEC_PREFLAGS} $<TARGET_FILE:benchmark_axisymmetric_core_2d>
+              ${CMAKE_CURRENT_SOURCE_DIR}/examples/2d_normal_core_convergence_smoke.nml
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_input.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_mapped.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_metrics.txt
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_final.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_history.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/normal_core_smoke_checkpoint.dat
+              ${MPIEXEC_POSTFLAGS}
+    )
+    set_tests_properties(normal_core_2d_solver_smoke PROPERTIES
+      PROCESSORS 10
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_test(
+      NAME a_phase_core_asymptotic_smoke
+      COMMAND ${MPIEXEC_EXECUTABLE} ${FERMIFORGE_MPI_10_LOCAL_FLAGS}
+              ${MPIEXEC_NUMPROC_FLAG} 10
+              ${MPIEXEC_PREFLAGS} $<TARGET_FILE:benchmark_axisymmetric_core_2d>
+              ${CMAKE_CURRENT_SOURCE_DIR}/examples/2d_a_phase_core_asymptotic_smoke.nml
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_input.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_mapped.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_metrics.txt
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_final.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_history.dat
+              ${CMAKE_CURRENT_BINARY_DIR}/a_phase_asymptotic_smoke_checkpoint.dat
+              ${MPIEXEC_POSTFLAGS}
+    )
+    set_tests_properties(a_phase_core_asymptotic_smoke PROPERTIES
+      PROCESSORS 10
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
   endif()
 

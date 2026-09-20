@@ -1584,3 +1584,692 @@ Recorded March 2027 as the start of collaborative FermiForge development. The
 repository will be prepared before then with explicit licensing and provenance,
 cross-platform onboarding, automated regression tests, contributor guidance,
 and accepted two-dimensional normal- and A-phase-core workflows.
+
+## 2026-09-18 - Self-consistent normal-core 2D solver and cell study
+
+Extended the axisymmetric 2D benchmark from a single map into a complete
+fixed-mesh nonlinear solver. Active Cartesian points are distributed over MPI,
+the existing full spin-matrix 3He map is evaluated, and the translated legacy
+Anderson implementation advances the full 21-real-values-per-point state.
+The driver records explicit `single_map`, `converged`, `iteration_limit`, and
+`map_failure` terminal states, per-evaluation residual and accelerator history,
+cumulative timings, and maximum propagator-normalization error.
+
+Added version-1 2D field-map input with strict point-count and coordinate
+checks. Runs now preserve initial, last-map, final, and checkpoint fields; a
+checkpoint can restart the same mesh while deliberately resetting the
+Anderson history. A round-trip regression test protects the full complex 3 by
+3 order parameter and all three current-related Fermi-liquid mean fields.
+
+The organized Python runner now exposes nonlinear, perturbation, and restart
+controls, streams iteration progress, archives all new products and hashes,
+and plots the initial/final fields plus a logarithmic residual history labelled
+with the legacy Anderson engine and mixing parameter. A separate cell-study
+driver runs the normal core in two multiscale domains, compares both final
+states with the converged radial `new_src/qcv` reference, directly compares
+common inner nodes, and writes CSV/JSON acceptance reports.
+
+The complete strict suite now contains 26 tests, including ten-rank execution
+of the user-facing normal-core solver. A separate three-evaluation ten-rank
+run exercised actual Anderson updates and converged from maximum residual
+`5.445e-3` to `2.358e-3`; the largest propagator-normalization error was
+`1.67e-15`. The long 60-evaluation two-cell production study remains for the
+user to run and review before M1-06 can be accepted.
+
+## 2026-09-18 - Harmonic 2D plots and asymptotic mean-field rule
+
+Extended the 2D field plotter to transform every full Cartesian order-parameter
+map to the source `(+ ,0,-)` spin/orbital harmonic basis. Every organized run
+now produces common-scale 3 by 3 amplitude and phase-cosine figures labelled
+`A++` through `A--`, in addition to the Cartesian figures. The transformation
+copies the authoritative `new_src/op_harm` formulas already frozen in
+`src/order_parameter_basis.f90` and verifies preservation of the total tensor
+norm at every plotted point.
+
+Recorded the free-vortex exterior rule needed beyond the present radial
+benchmark halo. Both the order-parameter matrix and the Fermi-liquid
+current-related mean field have angle-dependent `1/r` and `1/r^2` coefficient
+functions. They will be extracted from a matching annulus after every interior
+update and used to regenerate dependent outer nodes; those nodes will not be
+independent Anderson degrees of freedom. This supports a nonaxisymmetric
+double-core tail without imposing the reduced two-constant hydrostatic form.
+
+## 2026-09-18 - Two-term asymptotic continuation and A-core benchmark
+
+Implemented the first executable version of the angle-dependent exterior.
+Two samples on each radial ray determine full complex-matrix `1/r` and `1/r^2`
+coefficients after subtraction of the winding-one bulk B-phase field. The same
+fit is applied independently to all three Fermi-liquid mean-field components.
+Both a preserved axial radial profile and the current 2D state can supply the
+fit samples. Inactive halo nodes can now be regenerated as dependent values
+without entering the Anderson residual.
+
+Added regression coverage using an analytic field whose coefficients differ
+between positive and negative spatial directions, plus a check that a corrupt
+outer node is reconstructed from the interior fit. The focused basis,
+asymptotic, and A-core point-map tests pass. A ten-rank A-phase-core run with
+fit radii `7 xi0` and `9 xi0`, active radius `9 xi0`, and outer trajectory
+radius `70 xi0` completed one full map with maximum propagator-normalization
+error `1.55e-15`; its active-region area-weighted relative-L2 residual was
+`1.14e-2`. The complete 27-test strict suite passes, including the new
+ten-rank A-core asymptotic smoke test.
+
+## 2026-09-18 - Legacy full-2D field import
+
+Added a modern Fortran reader for the split full-2D legacy state. It infers an
+x-fast rectilinear mesh from `op_x`, requires coordinate identity in `op_y`,
+`op_z`, and `curr`, reconstructs the complete complex 3 by 3 order parameter,
+and preserves all three current-related Fermi-liquid mean fields. Import-time
+diagnostics check the redundant stored gap norm and in-plane field magnitude
+and identify the minimum-gap grid point.
+
+Added a standalone inspection/conversion executable and a synthetic
+nonuniform-grid regression test. The raw `2D_benchmarks/` archive is now
+ignored by Git because it is stored separately. Its `Cpp` through `Cmm`
+postprocessing files are documented as using a distinct historical mixed-
+component normalization; they are not silently interpreted as the
+orthonormal FermiForge harmonic basis.
+
+The importer read the archived `T=0.30`, `F1s=5.4` double-core field as a
+`601 by 601` grid with 361,201 points. The reconstructed matrix norm agrees
+with the rounded `curr` column to `1.01e-6`, the in-plane mean-field magnitude
+agrees to `1.14e-7`, and the minimum gap is `0.2173645` at one of the two
+half-core positions, `y=11.8 xi0`. A fresh strict build and all 28 tests pass,
+including the 1-, 4-, and 10-rank MPI checks and both radial core comparisons.
+
+## 2026-09-18 - First nonaxisymmetric double-core MPI map
+
+Connected the imported full-2D state directly to the modern MPI field map.
+The benchmark keeps all 361,201 imported points as the trajectory
+interpolation field but evaluates a configurable sparse set of target points,
+making the first nonaxisymmetric residual measurement practical on the
+ten-core laptop. Its compact output records overall, core, and outer residuals
+plus per-point gap and mean-field changes. It never updates the supplied
+state.
+
+The initial 11-point run used the legacy 64 by 11 angular quadrature, eight
+Ozaki poles, ten MPI ranks, and a maximum trajectory interval of `0.25 xi0`.
+The overall relative-L2 residual was `6.4715e-4`; the three center/core probes
+gave `1.4240e-3`, while the eight outer probes gave `3.2996e-6`. The largest
+point residual occurred at `(0,-11.8 xi0)`, with the opposite half core
+agreeing by symmetry. Propagator normalization remained within `1.56e-15`,
+and the slowest rank completed in 6.77 seconds. Repeating with `0.125 xi0`
+gave a core residual of `1.4759e-3`, so a formal step-size study remains.
+
+This first run deliberately terminates trajectories at the supplied field
+boundary. The existing state-fit asymptote assumes an identity bulk spin-orbit
+rotation, whereas the archived double core contains a rotated B-phase
+far-field matrix. That continuation will not be enabled until its bulk
+reference is generalized; the benchmark labels its present boundary policy
+`local_supplied_field` explicitly.
+
+## 2026-09-18 - Fitted B-phase bulk reference and dense double-core stencil
+
+Generalized the free-vortex endpoint from the fixed bulk matrix
+`Delta exp(i phi) I` to `Delta exp[i(phi+phi0)] R`, where the common phase and
+proper spin-orbit rotation `R` are fitted from an angular ring of the supplied
+full 2D state. The fit removes the imposed vortex winding, infers the common
+complex phase, and projects the real average onto SO(3). The existing
+angle-by-angle two-radius fit then retains every remaining complex matrix and
+mean-field component through independent `1/r + 1/r^2` coefficients. An
+analytic rotated-state regression test protects the fitted phase, rotation,
+and exterior continuation.
+
+Changed the double-core benchmark to use the fitted asymptotic endpoint by
+default and to sample 3 by 3 stencils around both half cores, while retaining
+one central point and eight distinct outer probes. The resulting 27-point,
+ten-rank map has overall relative-L2 residual `1.3820e-3`, core value
+`1.7887e-3`, outer value `3.2996e-6`, and normalization error `1.55e-15`.
+The fitted constant reference is identity to `4.6e-10` with phase offset
+`2.43e-8`; the much larger normalized annular RMS deviation `8.90e-2`
+quantifies the angle-dependent soft texture retained in the tail.
+
+A matched dense-stencil control ending trajectories at the supplied field
+boundary agrees with the asymptotic calculation to `2.0e-14` in the overall
+relative-L2 residual and `2.1e-11` in the outer relative-L2 residual. The full
+strict suite passes all 28 tests, including 1-, 4-, and 10-rank MPI cases.
+
+## 2026-09-18 - Active-only Anderson and first repeated double-core update
+
+Added masked packing and unpacking for the full 21-real-value spinful state
+and threaded the active mask through both serial and MPI Anderson adapters.
+Inactive points are preserved bit for bit and never enter the accelerator
+history. The axisymmetric solver now uses the same active-only path, removing
+the previous memory penalty from dependent halo nodes.
+
+Extended the imported double-core driver from a one-map measurement to a
+configurable nonlinear iteration smoke test with history output, explicit
+terminal status, optional full-field output/restart, and refitting of the
+bulk phase/SO(3) reference after every accepted update. The present controlled
+mode updates the two 3 by 3 half-core stencils, pins the center, and freezes
+the imported exterior. Its Anderson vector has 378 values rather than the
+7,585,221 values of the complete 601 by 601 field.
+
+A two-update ten-rank run completed with mixing parameters `0.01` and `1.19`.
+The sampled relative-L2 residual decreased from `1.3820e-3` to `1.3763e-3`,
+the movable-core maximum residual decreased from `3.8069e-4` to `3.7932e-4`,
+and normalization stayed below `1.68e-15`. The expected terminal state is
+`iteration_limit`; this run validates the iteration machinery and is not yet
+a physical double-core relaxation.
+
+Added selectable smooth update regions without changing the imported
+interpolation field: paired disks about the half-core minima or a centered
+disk about the vortex. The first paired-disk run used radius `0.4 xi0`, 26
+movable points, and a 546-value Anderson vector. Two ten-rank updates completed
+with mixing `0.01` and `1.23`; their maximum movable residual changed from
+`4.330e-4` to `4.312e-4`, with normalization below `1.56e-15`. This supplies a
+controlled radius ladder toward a complete hard/soft-core calculation while
+retaining the imported exterior as the temporary orientation constraint.
+
+## 2026-09-18 - Sparse double-core continuation and radius ladder
+
+Added coordinate-checked sparse state checkpoints for the full spinful 2D
+state. A checkpoint contains only selected points and all 21 real state values
+at each point. Reading overlays those values on an already initialized field,
+rejects coordinates absent from the mesh and duplicate records, and leaves
+every unlisted value unchanged. A nonuniform-mesh regression protects the
+round trip and the unchanged exterior.
+
+The imported double-core solver can now overlay a sparse restart after reading
+the archived full field and write the final movable region in the same format.
+The new radius-ladder runner generates separate timestamped cases, advances
+through strictly increasing paired-disk radii, carries each sparse result into
+the next case, and records CSV/JSON summaries plus an optional headless plot.
+
+The first ten-rank continuation used radii `0.4` and `0.6 xi0`, with two map
+evaluations at each radius. The movable set grew from 26 to 58 points and the
+Anderson vector from 546 to 1,218 values. The second case reported that all 26
+earlier points were applied from its sparse restart. Its movable maximum
+residual changed from `5.5168e-4` to `5.4919e-4`, the core relative-L2 residual
+was `1.7714e-3`, and normalization remained within `1.57e-15`. Both runs ended
+at the intentional iteration limit. Tangent-mode projection is the next gate
+before materially larger, converged hard- and soft-core regions are attempted.
+The complete strict suite passes all 29 tests after this addition.
+
+## 2026-09-18 - Explicit double-core tangent-mode projection
+
+Added a reusable collective-coordinate projector for the full 21-value
+spinful 2D state. It constructs global-gauge, two translation, and in-plane
+orientation tangents from an initial template on the active cells. General
+rectilinear three-point derivatives support the nonuniform meshes already in
+FermiForge. Twice-reorthogonalized tangent vectors use exactly the unweighted
+Euclidean metric of the current masked Anderson vector.
+
+The orientation convention is named rather than implicit. It is the
+gauge-compensated coordinate action
+`exp(i theta) A(R(-theta) r)`, whose infinitesimal order-parameter tangent is
+`i A + y d_x A - x d_y A`. The current-related mean field receives the
+coordinate part. No spin- or orbital-index rotation is silently included.
+The corresponding residual components are removed before Anderson mixing;
+the original self-consistency map and its unprojected diagnostics are retained.
+
+Added an analytic nonuniform-grid regression. It verifies exact removal of a
+known combination of all four tangents, preservation of an arbitrary residual
+orthogonal to their span, basis orthonormality, and unchanged inactive cells.
+The double-core MPI driver exposes `none`, translations only, translations plus
+orientation, and the complete gauge/translation/orientation selection. Every
+iteration records the removed norm, fraction, and four coefficients.
+
+A two-map, ten-rank run on the paired `0.4 xi0` disks retained all four
+tangents. The removed fraction was only `1.46e-6`, as expected for the aligned,
+highly symmetric archived state. The projected update maximum differed from
+the unprojected value by `2.55e-10`; normalization remained `1.55e-15` and the
+original residuals were unchanged. The frozen imported exterior remains in
+place for this control. Releasing it in favor of a regenerated dependent halo
+is the next double-core expansion step. The complete strict suite passes all
+30 tests after this addition.
+
+## 2026-09-18 - First runnable double-core continuation with dependent halo
+
+Connected the state-derived asymptotic continuation to the iterated
+double-core driver. With `inactive_halo_policy = 'state_asymptotic'`, points
+outside the outer matching radius are no longer frozen imported data. After
+every accepted update the root rank refits the bulk phase and SO(3) reference,
+refits angle-dependent `1/r + 1/r^2` tails for the complete complex 3 by 3
+order parameter and the three Fermi-liquid mean fields, regenerates the outer
+halo, and broadcasts it. The dependent halo remains outside the Anderson
+vector. The inner nonupdated annulus is intentionally still fixed and supplies
+the fit for this first small-radius continuation.
+
+Extended the radius-ladder runner with the halo policy, exact validation of an
+initial sparse restart, and halo diagnostics in its CSV and JSON reports.
+Added `tools/run_first_double_core_2d.py` as a one-command test entry point. Its
+defaults select ten ranks, radii `0.4` and `0.6 xi0`, two updates per radius,
+the gauge/translation/orientation projector, and the dependent asymptotic
+halo.
+
+The `0.4 xi0` stage updated 26 points and 546 Anderson values. Its final update
+maximum was `4.3117e-4`, tangent fraction `1.462e-6`, and normalization error
+`1.55e-15`. A separately resumed `0.6 xi0` stage verified that all 26 earlier
+points were read before expanding to 58 update points and 1,218 Anderson
+values. It finished with update maximum `5.4919e-4`, tangent fraction
+`7.269e-6`, sample/core relative-L2 residuals `1.6069e-3`/`1.7714e-3`, and
+normalization error `1.67e-15`. On the supplied 601 by 601 field, 97,012 outer
+points were regenerated and their last maximum change was `3.74e-7`.
+
+Both stages intentionally stopped at the two-iteration limit. This establishes
+a reproducible first code version for user testing; it does not establish a
+converged physical double-core solution. The exact one-command workflow then
+passed end to end, including its sparse handoff and JSON acceptance report.
+The complete strict suite passes all 30 tests after this addition.
+
+## 2026-09-18 - Analytic from-scratch double-core iteration
+
+Added a modern regularized London initializer derived from Eq. (4) of
+`dcvlong.pdf`. Branch-free sums and differences of the two regularized
+half-core phases generate the London `A_xx=A_zz` and `A_zx=-A_xz` components.
+A continuous winding-one `A_yy` field, suppressed over a finite-width type-10
+wall, replaces the discontinuity of the ideal London model. The seed has two
+symmetric pair-density minima, a planar-filled center, the correct bulk
+winding limit, and zero initial Fermi-liquid mean field. A direct test protects
+these properties.
+
+Extended the double-core MPI driver with a `regularized_london`
+initialization mode and uniform or three-zone multiscale mesh construction.
+This route does not read the archived 2D order parameter. It retains the
+state-fitted asymptotic endpoint, dependent halo, collective-coordinate
+projection, active-only Anderson mixing, full and sparse checkpoint output,
+and all existing diagnostics. The same source now builds under the modern
+`fermiforge_double_core_2d` executable name while preserving the legacy
+benchmark executable.
+
+Added a one-command runner and a documented smoke input. Its 29 by 29 mesh
+contains 113 active nodes and 340 dependent halo nodes. Two ten-rank maps took
+29.2 and 31.3 seconds. The maximum update residual changed from `6.881e-2` to
+`6.849e-2`, Anderson mixing reached `0.670`, and normalization remained within
+`1.67e-15`. The seed pair amplitudes were `0.21219` at the center and `0.15846`
+at each half core. All full-field, harmonic, density/current, convergence, and
+JSON outputs were generated successfully. This proves that a double-core
+candidate can begin self-consistent iteration from scratch; it is not yet a
+converged production solution. A one-map continuation then applied all 113
+sparse checkpoint records and reduced the sample relative-L2 residual from
+`1.10e-1` to `3.64e-2`. The complete strict suite passes all 31 tests.
+
+## 2026-09-18 - Sustained scratch iteration and symmetry-axis profiles
+
+Removed the accidental two-update user-facing ceiling from the from-scratch
+runner. An ordinary invocation now requests up to 20 Anderson updates while
+retaining `--iterations 2` as the short smoke test. The iteration history was
+already flushed after each map; the solver now additionally replaces a sparse
+active-state checkpoint after every completed update by default. Thus an
+interrupted long trajectory map can resume from the preceding accepted state.
+Checkpoint cadence is explicit in the namelist, command line, metrics, and
+JSON report.
+
+Added a double-core axis-profile diagnostic corresponding to Fig. 4 of
+`dcvlong.pdf`. It extracts all non-negligible real and imaginary `A_mn`
+channels along the positive x and y symmetry axes from the native rectilinear
+2D output, reverses the x panel toward the common origin as in the source
+figure, and normalizes by the outer bulk amplitude. The generated two-row
+figure compares the regularized London seed with the state after iteration.
+Colour-blind-safe row colours, column line styles, and open markers for
+imaginary parts avoid reliance on colour alone.
+
+A three-update, ten-rank verification wrote all per-update history and
+checkpoint products, generated twelve PNG figures, and passed its JSON gate.
+The update maximum changed from `6.881e-2` through `6.849e-2` to `1.913e-2`;
+Anderson mixing reached `0.728`, the history depth reached three, and the
+maximum propagator-normalization error was `1.67e-15`. The complete strict
+suite still passes all 31 tests.
+
+## 2026-09-18 - Overnight double-core branch-stability preset
+
+Added a separate large from-scratch double-core input, leaving the compact
+regression unchanged. The overnight preset spans `+/-40 xi0`, contains 119 by
+119 multiscale points, uses `0.4 xi0` spacing in the central `+/-14 xi0`
+square, and relaxes 7,249 points inside radius `22 xi0`. Its two hard cores
+start at `y=+/-10 xi0`; a four-coherence-length fixed annulus separates the
+active disk from the state-fitted asymptotic source region. The corresponding
+Anderson vector has 152,229 real values. Point-count scaling predicts roughly
+10--14 hours for its default 20 updates on the reference ten-core MacBook Pro.
+
+The nonlinear history now records the positive and negative y-axis
+pair-amplitude minima, their separation, both minimum amplitudes, and the
+center amplitude after every accepted update. The live iteration record prints
+the measured separation as `a=`. A new colour-blind-safe history plot makes a
+collapse toward a single-core branch directly visible. The runner now produces
+thirteen PNG diagnostics and records the final separation in its JSON report.
+
+The new measurement/output path passed a real ten-rank update: the compact
+seed retained minima at `y=+/-2 xi0`, reported `a=4 xi0`, wrote all thirteen
+plots, and passed the JSON gate. The complete strict suite continues to pass
+all 31 tests.
+
+## 2026-09-18 - Faithful historical nop/aop/dop seed port
+
+Ported the three formulas supplied in
+`new_src/how_I_initialise_the_different_cores.f` into the independent modern
+module `historical_core_seed_2d`. The original file remains unchanged. The
+port explicitly preserves the origin convention, unit phase winding,
+`tanh(ar)/ar` limit, A-phase-core angular factors, dop `cos(phi)^2`
+perturbation, antisymmetric matrix signs, and the dop-only
+`(1+aa0)/sqrt(1-t^2)` radial scale. Components left implicit by the old caller
+are explicitly zeroed, as are the three initial Fermi-liquid mean fields.
+
+The 2D driver now accepts `historical_nop`, `historical_aop`, and
+`historical_dop` initialization modes with an explicit
+`seed_reduced_temperature`. Added a large historical-dop input and one-command
+runner using the same mesh, active disk, asymptotic continuation, quadrature,
+Anderson controls, and checkpoint cadence as the London-seeded overnight run.
+Only the seed differs, allowing a controlled spontaneous-splitting versus
+branch-preservation comparison.
+
+A pointwise regression checks the origin, positive x and y axes, complex
+winding, aop `zx/zy` channels, dop angular node, antisymmetry, feedback-scale
+dependence, and zero mean field. The new test passes, and the MPI application
+compiles with all historical initialization modes. The full suite was not run
+concurrently with the user's ten-rank overnight calculation to avoid resource
+contention.
+
+## 2026-09-19 - Anisotropic checkpoint extension of the large double core
+
+The first 20-update overnight calculation completed successfully on the 119 by
+119 multiscale mesh. It retained two half-core minima at `y=+/-9.2 xi0`
+(`a=18.4 xi0`), kept the propagator normalization error below `1.6e-15`, and
+used about 1,005 seconds per final field map. Its axis profiles change
+abruptly at the radius-22 active boundary on the y axis, although the x-axis
+profiles are substantially contained. The outer relative-L2 residual
+(`1.20e-2`) is also much larger than the active-core value (`3.46e-4`), and
+the largest sampled residual lies close to the old active boundary. These
+diagnostics identify active-domain truncation rather than insufficient total
+cell size.
+
+Added a `centered_ellipse` update mask with independent x and y radii to the
+Fortran MPI driver. The core-separation diagnostic now uses the y radius of
+that mask, and both radii are written to the machine-readable metrics. Added
+a staged continuation runner and input preset. The first stage keeps
+`Rx=22 xi0` and extends to `Ry=28 xi0` (8,457 points), retaining the existing
+`26--32 xi0` asymptotic hand-off. The second extends to `Ry=34 xi0` (9,263
+points) and moves the hand-off to `32--36 xi0`. Set-containment checks confirm
+that the old disk is a subset of the first ellipse and the first ellipse is a
+subset of the second, so sparse continuation loses no relaxed nodes.
+
+Every accepted update remains checkpointed. The ladder automatically finds
+the newest overnight checkpoint, builds once, runs both stages with fresh
+Anderson histories, and records each stage's axis-profile plot and restart in
+`y_extension_report.json`. Explicit `--restart` and `--start-stage y34`
+controls provide deterministic recovery. Python syntax checks, namelist
+replacement checks, source formatting checks, and the updated MPI executable
+build pass. The complete suite passes all 32 tests, including the one-, four-,
+and ten-rank MPI field-map cases and both axisymmetric solver smoke tests. A
+separate ten-rank elliptical-mask integration check completed one Anderson
+update, selected 35 points inside a `3 x 4 xi0` ellipse, wrote its sparse
+checkpoint, reported both radii correctly, and held the normalization error to
+`1.22e-15`.
+
+## 2026-09-19 - Solution-driven active-domain adaptation
+
+The fixed `22 x 28` and `22 x 34 xi0` ladder is retained only as a deterministic
+validation case. It is not suitable as a production sizing rule because the
+hard-core and soft-texture lengths change with temperature, pressure, and the
+Fermi-liquid parameters.
+
+Added a directional domain diagnostic that reads the completed field and its
+pointwise map residuals. On each axis it measures the field step across the
+active/inactive interface relative to the preceding interior steps. It also
+compares the RMS residual in an outer elliptical collar with the inner-core
+RMS. Both criteria are normalized, independent of absolute gap units, and
+stored together with their explicit tolerances. Applied to the completed
+overnight state, the diagnostic accepts x but rejects y: interface
+amplifications are 2.27 and 8.09, while boundary/core residual ratios are
+0.195 and 0.281, respectively, for provisional limits 3.0 and 0.25. This
+automates the conclusion drawn from the axis-profile plot without embedding
+the desired y radius.
+
+Added an adaptive controller that infers the current radii from checkpoint
+metrics, grows only failing axes by a configurable factor with a minimum of
+one local mesh interval, moves the asymptotic fit and matching surfaces in
+mesh-spacing units, and repeats checkpointed relaxation blocks. Each stage
+records the change on all common checkpoint points. It terminates as
+`adequate`, `maximum_stages`, or `cell_limit`; the latter explicitly requests
+cell enlargement/remeshing rather than consuming the asymptotic guard. A
+diagnostics-only run against the overnight checkpoint correctly selected only
+the y direction. Automatic interpolation onto a newly generated larger mesh
+is deliberately left as the next adaptive-remeshing layer.
+
+A compact ten-rank integration test exercised the complete controller rather
+than only its analysis functions. It inferred a `3 x 4 xi0` source ellipse,
+selected both axes from the deliberately unconverged smoke residual, expanded
+by at least one local mesh interval to `4 x 5 xi0`, generated the corresponding
+`2.5--9 xi0` fit/matching geometry, applied all 35 inherited checkpoint
+records, completed a field map and Anderson update, wrote the 61-point new
+checkpoint, and correctly terminated as `maximum_stages` after the requested
+single test stage. The maximum propagator-normalization error was `1.22e-15`.
+
+## 2026-09-19 - Recovery and diagnosis of the first production adaptive stage
+
+The first production adaptive stage completed eight updates on the 119 by 119
+mesh with an active `22 x 27.5 xi0` ellipse. It retained a half-core separation
+of `18.4 xi0`, reduced the active-core relative-L2 residual to `2.20e-4`, and
+kept the maximum propagator-normalization error at `1.56e-15`. All numerical
+products and the restart checkpoint were written. PRRTE nevertheless returned
+a nonzero launcher status during shutdown after the Mac had slept during the
+fourth map. The plotting products were recovered from the completed outputs.
+
+The scratch-run driver now treats such a launcher failure as recoverable only
+when every expected field, history, residual, metrics, and checkpoint file
+exists in the newly created run directory. The normal numerical validation is
+then still required; partial calculations remain fatal. The launcher warning
+is preserved in the JSON report.
+
+The solution-driven diagnostic rejects both current radii. At `Rx=22 xi0`,
+the interface amplification is 2.26 but the boundary/core residual ratio is
+0.629, so x is residual-limited. At `Ry=27.5 xi0`, the interface amplification
+is 10.52 and the boundary/core residual ratio is 0.880, so y fails both field
+continuity and residual criteria. The next adaptive continuation must therefore
+grow both axes from the recovered checkpoint; it must not restart the double
+core from the analytic seed.
+
+Added symmetry-axis diagnostics in the axial harmonic basis. The overview
+plots all nine bulk-subtracted harmonic magnitudes on common logarithmic axes.
+Separate x- and y-axis figures now enforce Eqs. (19)--(20) of `dcvlong`:
+`+0`, `0+`, `0-`, and `-0` are scaled by `r/Rc` and must approach a
+constant, while `++`, `+-`, `00`, `-+`, and `--` are scaled by `(r/Rc)^2`
+and must approach a constant. The symmetry-allowed coefficient and the
+active-tail mismatch of each harmonic are also written as JSON.
+
+The harmonic diagnostic confirms the small x-boundary kink and shows a much
+larger y-direction failure. Most x channels differ from their allowed
+single-power continuation by 5--8 percent in the outer active tail, with `--`
+at 16 percent. The y-channel mismatches range from 43 percent to 140 percent.
+The saved exterior differs from the Eq. (20)-constrained continuation by
+relative L2 errors of `2.2e-2` on x and `8.8e-1` on y.
+
+This check exposed two coupled limitations. First, the state-fit implementation
+currently solves for both `1/r` and `1/r^2` coefficients in every matrix
+element, although Eq. (20) puts them in disjoint Cartesian blocks. Second, the
+controller's update boundary is an ellipse while its fit and halo surfaces are
+circles. The `25.9--29.1 xi0` circular fit annulus lies wholly outside the x
+active radius and crosses the y active radius. Interpolation at the circular
+matching surface can also read a grid node that is overwritten as halo during
+the same refresh. Before another expensive continuation, the state fit must
+enforce Eq. (20), its source/matching surface should become angle-dependent
+(or otherwise be separated from the dependent-halo stencil), and the y mesh
+should retain finer spacing through that source region.
+
+## 2026-09-19 - Self-consistent Eq. (20) asymptotic iteration
+
+Corrected the state-fitted free-vortex continuation before another production
+run. The order parameter now follows Eqs. (19)--(20) of `dcvlong` explicitly:
+the mixed z/in-plane Cartesian entries are continued with their angle-dependent
+`1/r` coefficient, while the in-plane block and zz entry use the
+angle-dependent `1/r^2` coefficient. Each value is matched continuously at the
+outer source surface. The three real Fermi-liquid self-energy components are
+still sampled on two surfaces and retain independent `1/r` and `1/r^2`
+coefficients, as required by their current-like asymptotics.
+
+Generalized the source geometry from two circles to two nested ellipses. For
+each polar angle, the code computes the radial intersections with the inner
+fit and outer matching ellipses. The bulk B-phase reference is fitted on that
+same matching ellipse. The adaptive controller places both source surfaces a
+configurable number of local mesh intervals inside the active ellipse. Every
+node outside the active ellipse is regenerated from the current interior state
+after each accepted Anderson update, so the calculation no longer contains a
+frozen collar or reads source values that it has just overwritten as halo.
+The circular path remains unchanged for the radial and axisymmetric cases.
+
+Added a regression test with unequal x/y source radii. It verifies both Eq.
+(20) block powers, recovery of both Fermi-liquid coefficients, and dependent
+halo reconstruction. Added a compact full-path input with a `5 x 6 xi0`
+active ellipse, `3 x 4 xi0` inner ellipse, and `4 x 5 xi0` matching ellipse.
+A ten-rank run completed one MPI map and Anderson update, regenerated 530 halo
+points, left no frozen nonupdated points, and reported a maximum propagator
+normalization error of `1.37e-15`. The halo refresh change decreased from
+`6.23e-3` initially to `3.00e-4` after the update.
+
+Closed a restart gap exposed by the same check. Adaptive growth must inherit
+the old dependent halo because those points become independent unknowns when
+the active ellipse expands. The double-core driver now has an explicit
+`checkpoint_scope`; production scratch/adaptive inputs select `full_state`,
+while legacy small-patch cases retain compact `update_region` checkpoints.
+The adaptive controller also converts the sibling full-field product of an
+older checkpoint into a complete restart before its first new stage. The
+compact test wrote and then reapplied all 841 mesh points. On restart the
+initial halo refresh changed the state by exactly zero, all 841 records were
+reported as applied, and the following map retained normalization to
+`1.56e-15`. The converter similarly recovered all 14,161 points of the saved
+119 by 119 production field, so newly admitted cells will not revert to the
+analytic London seed.
+
+## 2026-09-19 - Fixed bulk winding reference and overnight hold run
+
+Aligned the implementation with the definition immediately below Eq. (19) of
+`dcvlong`: the zeroth-order field is the bulk order parameter with phase
+winding, `A0 = Delta_B exp(i phi) I`, rather than an angle-dependent texture to
+be refitted during the nonlinear solve. Generated vortex runs now select the
+explicit `theoretical` bulk-reference policy. The phase offset remains exactly
+zero and the bulk rotation exactly the identity. `fit_initial` remains
+available only to translate a legacy imported field into the code convention;
+after that one fit, its reference is also frozen. Later iterations measure the
+deviation from the fixed reference without modifying it. A regression test
+ensures the diagnostic path cannot change `A0`.
+
+Added `--hold-domain` to the adaptive controller for a controlled overnight
+comparison. It runs one checkpointed relaxation block at the existing active
+radii instead of coupling the asymptotic correction to domain growth. For the
+current production state this gives an active `22 x 27.5 xi0` ellipse, an inner
+fit ellipse of `18.8 x 24.3 xi0`, and a matching ellipse of
+`20.4 x 25.9 xi0`; all remain inside the existing medium-resolution region.
+Automatic source selection now prefers the largest field before recency, so a
+compact smoke run cannot silently replace the 119 by 119 production source.
+
+The complete hold-domain route was verified on ten MPI ranks. It restored all
+841 compact-state points, retained zero bulk phase offset and identity bulk
+rotation, completed the MPI map and Anderson update, and held the propagator
+normalization error to `1.37e-15`. The full 32-test regression suite passes.
+
+## 2026-09-20 - Independent off-domain asymptotic probes
+
+Replaced the tautological exterior-tail diagnostic with an independent map
+check. The double-core solver can now place a configurable sequence of passive
+probe points on the positive and negative x and y rays between the active
+domain and the physical mesh edge. Each probe receives a full quasiclassical
+self-consistency evaluation, while its stored input is the imposed asymptotic
+continuation. Probe points are explicitly excluded from Anderson mixing even
+when legacy outer-probe updates are enabled.
+
+The solver writes the complete 3 by 3 complex input and mapped order-parameter
+matrices plus all three input and mapped Fermi-liquid mean-field components.
+The new plotting tool transforms both matrices to the axial harmonic basis and
+plots the imposed tail together with the mapped-minus-imposed residual on
+logarithmic axes. It also writes machine-readable imposed-tail RMS,
+map-minus-tail RMS, and meaningful relative-RMS values per ray and harmonic.
+The production overnight templates request up to eight
+available mesh points per ray; the scratch runner adds that default to older
+custom inputs and archives the exact setting.
+
+Verified the full path with a two-rank, one-update 29 by 29 smoke case. Twelve
+unique passive probe nodes were evaluated outside the radius-3 update disk;
+the update region remained 113 points, the propagator normalization error was
+`1.33e-15`, all three new figures were produced, and the full 32-test suite
+passed.
+
+## 2026-09-20 - Held-out exterior shadow iteration
+
+Extended the passive ray check into an independent exterior solve. After the
+production iteration and checkpoint are complete, the code snapshots the
+final extrapolated field and relaxes selected exterior ray points. This shadow
+calculation has a separate Anderson history
+and never refreshes the endpoint fit, writes the physical checkpoint, or
+changes the production state. A runtime assertion verifies bit-for-bit that
+every point outside the shadow mask remains frozen.
+
+The diagnostic stores four states at every ray centre: the extrapolated
+baseline `B`, its first map `F(B)`, the relaxed shadow state `S*`, and a final
+verification map `F(S*)`. The resulting first defect `F(B)-B`, converged
+correction `S*-B`, and terminal defect `F(S*)-S*` distinguish an inaccurate
+tail from an unconverged diagnostic. Harmonic and Fermi-liquid panels, a
+shadow convergence plot, and a machine-readable JSON summary are generated by
+the normal run wrapper. The smoke input requests two shadow updates and the
+overnight inputs allow twelve; setting the new iteration count to zero retains
+the earlier passive-only behavior.
+
+A direct comparison selected isolated points as the default. With the coarse
+smoke mesh, a radius-one stencil forms a several-coherence-length artificial
+inclusion and can converge to a strongly suppressed local branch. Holding the
+neighbouring extrapolated nodes fixed retained the bulk branch: after six
+full-quadrature updates the terminal maximum defect fell to `2.39e-6`, while
+the shadow correction remained below `0.4%` of the bulk gap. Twelve updates
+reached the `1e-7` maximum-defect tolerance (`6.96e-8`). Patch radii remain
+available for an explicit mesh-spacing sensitivity study.
+
+Corrected the older passive output at the same time. On an
+iteration-limited run the previous file described the map immediately before
+the final Anderson update, whereas the shadow baseline and checkpoint
+described the accepted state after that update. Shadow-enabled runs now reuse
+exactly `B` and `F(B)` for the passive file; passive-only runs perform one
+fresh map restricted to the ray points. Cross-checks found byte-identical
+passive files for the two routes and byte-identical production final/checkpoint
+states, confirming that the diagnostic adds no feedback to the physical solve.
+
+The complete user-facing runner was then exercised on ten MPI ranks with one
+production update and two shadow updates. It produced all 23 expected PNG
+figures, both JSON diagnostics, the 45-column passive file, 87-column shadow
+file, and 9-column shadow history. Execution passed while the deliberately
+short shadow solve was correctly labelled `shadow_not_converged`, demonstrating
+that numerical run success is no longer confused with asymptotic validation.
+The full 32-test regression suite passes, including the one-, four-, and
+ten-rank MPI checks.
+
+## 2026-09-20 - Algorithm and code-architecture note
+
+Added a living LaTeX implementation note at
+`docs/technical_note/fermiforge_algorithm_and_architecture.tex`. It derives
+the state, Q1 field sampling, source-compatible Riccati coefficient equations,
+spin--Nambu reconstruction, Ozaki/angular quadratures, self-consistency map,
+Eq. (19)--(20) asymptotic continuation, residuals, zero-mode projection, and
+legacy Anderson update. It also records the exact current scope and avoids
+identifying the current-related Fermi-liquid field with a physically
+normalised mass current.
+
+The note contains two colour-accessible TikZ flowcharts: the complete nonlinear
+MPI algorithm and the principal Fortran module pipeline. Implemented,
+validated, experimental, and planned capabilities are separated explicitly;
+static rectilinear multiscale placement is not called AMR, and walls, DG,
+GPU offload, dipole self-consistency, and physical observable normalisation
+remain roadmap items. The compiled PDF was rendered page by page for visual
+inspection and is stored under `output/pdf/`.
+
+## 2026-09-20 - Hardened GitHub publication gate
+
+Updated the publishing workflow after the first post-development upload
+attempt stopped with all changes staged. The cause was generated LaTeX
+auxiliary files entering the index and then failing Git's whitespace check.
+Those products, including the transient PDF beside the source, are now ignored;
+the tracked documentation consists of the LaTeX source and the canonical PDF
+under `output/pdf/`.
+
+Replaced the local two-line GitHub shortcut with a tracked, location-independent
+wrapper that forwards all command-line options and lets the maintained uploader
+generate a dated commit message when none is supplied. The uploader now states
+whether a failed invocation created a local commit, prints commit hashes after
+successful commit and push steps, requires the MPI layer during the normal
+publication build, and performs a syntax check of every maintained Python tool.
+An explicit `--allow-no-mpi` escape hatch remains for deliberately reduced
+environments.
+
+The revised `./push_to_github.sh --dry-run` path was exercised with the absolute
+Homebrew GNU Fortran compiler. CMake found and built the MPI layer, all 32 tests
+passed including the one-, four-, and ten-rank MPI checks, and Python syntax
+validation passed for all 19 maintained tools. The dry run created no commit
+and contacted no remote.

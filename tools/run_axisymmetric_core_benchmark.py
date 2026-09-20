@@ -33,6 +33,14 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--case-name", default="normal-core")
     parser.add_argument("--initialization", default="radial-reference")
+    parser.add_argument(
+        "--initialization-mode",
+        choices=("radial_reference", "restart"),
+        help="override the solver initialization mode",
+    )
+    parser.add_argument(
+        "--restart", type=Path, help="restart from a saved 2D field map"
+    )
     parser.add_argument("--ranks", type=int, default=10)
     parser.add_argument("--jobs", type=int, default=10)
     parser.add_argument("--cells", type=int, help="override number_of_cells")
@@ -62,12 +70,53 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--outer-radius", type=float, help="override asymptotic_outer_radius"
     )
     parser.add_argument(
+        "--fit-inner-radius",
+        type=float,
+        help="override asymptotic_fit_inner_radius",
+    )
+    parser.add_argument(
+        "--matching-radius",
+        type=float,
+        help="override asymptotic_matching_radius",
+    )
+    parser.add_argument(
         "--trajectory-step", type=float, help="override trajectory_maximum_step"
     )
     parser.add_argument(
         "--endpoint-policy",
-        choices=("local", "free_vortex", "radial_reference"),
+        choices=(
+            "local",
+            "free_vortex",
+            "radial_reference",
+            "radial_asymptotic",
+        ),
         help="override endpoint_policy",
+    )
+    parser.add_argument(
+        "--max-iterations", type=int, help="override maximum_iterations"
+    )
+    parser.add_argument(
+        "--tolerance", type=float, help="override convergence_tolerance"
+    )
+    parser.add_argument(
+        "--anderson-history", type=int, help="override Anderson history limit"
+    )
+    parser.add_argument(
+        "--anderson-progress",
+        type=float,
+        help="override Anderson progress threshold",
+    )
+    parser.add_argument(
+        "--anderson-pmax", type=float, help="override Anderson maximum mixing"
+    )
+    parser.add_argument(
+        "--checkpoint-interval", type=int, help="checkpoint every N iterations"
+    )
+    parser.add_argument(
+        "--perturbation", type=float, help="initial radial perturbation amplitude"
+    )
+    parser.add_argument(
+        "--perturbation-radius", type=float, help="initial perturbation radius"
     )
     parser.add_argument("--build-dir", type=Path, default=DEFAULT_BUILD_DIRECTORY)
     parser.add_argument("--run-root", type=Path, default=DEFAULT_RUN_ROOT)
@@ -139,23 +188,44 @@ def sha256(path: Path) -> str:
 
 
 def run_logged(
-    command: Sequence[str], log_path: Path, environment: dict[str, str], append: bool = False
+    command: Sequence[str],
+    log_path: Path,
+    environment: dict[str, str],
+    append: bool = False,
+    echo: bool = False,
 ) -> None:
     mode = "a" if append else "w"
     with log_path.open(mode, encoding="utf-8") as log:
         log.write("command: " + " ".join(command) + "\n")
         log.flush()
-        result = subprocess.run(
-            command,
-            cwd=PROJECT_ROOT,
-            env=environment,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
-    if result.returncode != 0:
+        if echo:
+            process = subprocess.Popen(
+                command,
+                cwd=PROJECT_ROOT,
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            assert process.stdout is not None
+            for line in process.stdout:
+                log.write(line)
+                log.flush()
+                print(line, end="")
+            return_code = process.wait()
+        else:
+            result = subprocess.run(
+                command,
+                cwd=PROJECT_ROOT,
+                env=environment,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            return_code = result.returncode
+    if return_code != 0:
         raise RunnerError(
-            f"command failed with status {result.returncode}; see {log_path}"
+            f"command failed with status {return_code}; see {log_path}"
         )
 
 
@@ -233,7 +303,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             "coarse_spacing": arguments.coarse_spacing,
             "active_radius": arguments.active_radius,
             "asymptotic_outer_radius": arguments.outer_radius,
+            "asymptotic_fit_inner_radius": arguments.fit_inner_radius,
+            "asymptotic_matching_radius": arguments.matching_radius,
             "trajectory_maximum_step": arguments.trajectory_step,
+            "maximum_iterations": arguments.max_iterations,
+            "convergence_tolerance": arguments.tolerance,
+            "anderson_history_limit": arguments.anderson_history,
+            "anderson_progress_threshold": arguments.anderson_progress,
+            "anderson_maximum_mixing": arguments.anderson_pmax,
+            "checkpoint_interval": arguments.checkpoint_interval,
+            "initial_perturbation_amplitude": arguments.perturbation,
+            "initial_perturbation_radius": arguments.perturbation_radius,
         }
         for key, value in overrides.items():
             if value is not None:
@@ -245,6 +325,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         if arguments.mesh_kind is not None:
             input_text = replace_namelist_value(
                 input_text, "mesh_kind", f"'{arguments.mesh_kind}'"
+            )
+        if arguments.initialization_mode is not None:
+            input_text = replace_namelist_value(
+                input_text,
+                "initialization_mode",
+                f"'{arguments.initialization_mode}'",
+            )
+        if arguments.restart is not None:
+            restart_path = arguments.restart.expanduser().resolve()
+            if not restart_path.is_file():
+                raise RunnerError(f"restart field map does not exist: {restart_path}")
+            input_text = replace_namelist_value(
+                input_text, "initialization_mode", "'restart'"
+            )
+            input_text = replace_namelist_value(
+                input_text, "restart_field_file", f"'{restart_path}'"
+            )
+            input_text = replace_namelist_value(
+                input_text, "initial_perturbation_amplitude", "0.0"
             )
         archived_input.write_text(input_text, encoding="utf-8")
 
@@ -266,7 +365,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         mpiexec = find_program("mpiexec", (Path("/opt/homebrew/bin/mpiexec"),))
         input_map = run_directory / "input_fields_2d.dat"
         mapped_map = run_directory / "mapped_fields_2d.dat"
+        final_map = run_directory / "final_fields_2d.dat"
         metrics = run_directory / "metrics.txt"
+        history = run_directory / "iteration_history.dat"
+        checkpoint = run_directory / "checkpoint_fields_2d.dat"
         mpi_command = [str(mpiexec)]
         if sys.platform == "darwin":
             mpi_command.extend(
@@ -288,10 +390,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 str(input_map),
                 str(mapped_map),
                 str(metrics),
+                str(final_map),
+                str(history),
+                str(checkpoint),
             ]
         )
-        run_logged(mpi_command, run_directory / "run.log", environment)
-        for output in (input_map, mapped_map, metrics):
+        run_logged(
+            mpi_command, run_directory / "run.log", environment, echo=True
+        )
+        for output in (input_map, mapped_map, final_map, metrics, history):
             if not output.is_file():
                 raise RunnerError(f"benchmark did not produce {output}")
 
@@ -300,7 +407,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             python = find_plotting_python(environment)
             plot_script = PROJECT_ROOT / "tools" / "plot_2d_fields.py"
             plot_directory = run_directory / "plots"
-            for role, field_map in (("input", input_map), ("mapped", mapped_map)):
+            for role, field_map in (("input", input_map), ("final", final_map)):
                 command = [
                     str(python),
                     str(plot_script),
@@ -318,6 +425,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                     environment,
                     append=role != "input",
                 )
+            convergence_plot = plot_directory / f"{timestamp[:6]}_{label}_convergence.png"
+            run_logged(
+                [
+                    str(python),
+                    str(PROJECT_ROOT / "tools" / "plot_2d_iteration_history.py"),
+                    str(history),
+                    "--output",
+                    str(convergence_plot),
+                ],
+                run_directory / "plot.log",
+                environment,
+                append=True,
+            )
             plots = [str(path) for path in sorted(plot_directory.glob("*"))]
 
         manifest = {
@@ -339,8 +459,24 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "coarse_spacing": arguments.coarse_spacing,
                     "active_radius": arguments.active_radius,
                     "asymptotic_outer_radius": arguments.outer_radius,
+                    "asymptotic_fit_inner_radius": arguments.fit_inner_radius,
+                    "asymptotic_matching_radius": arguments.matching_radius,
                     "trajectory_maximum_step": arguments.trajectory_step,
                     "endpoint_policy": arguments.endpoint_policy,
+                    "maximum_iterations": arguments.max_iterations,
+                    "convergence_tolerance": arguments.tolerance,
+                    "anderson_history_limit": arguments.anderson_history,
+                    "anderson_progress_threshold": arguments.anderson_progress,
+                    "anderson_maximum_mixing": arguments.anderson_pmax,
+                    "checkpoint_interval": arguments.checkpoint_interval,
+                    "initial_perturbation_amplitude": arguments.perturbation,
+                    "initial_perturbation_radius": arguments.perturbation_radius,
+                    "initialization_mode": arguments.initialization_mode,
+                    "restart_field_file": (
+                        str(arguments.restart.expanduser().resolve())
+                        if arguments.restart is not None
+                        else None
+                    ),
                 }.items()
                 if value is not None
             },
@@ -350,7 +486,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             "executable_sha256": sha256(executable),
             "input_field_map_sha256": sha256(input_map),
             "mapped_field_map_sha256": sha256(mapped_map),
+            "final_field_map_sha256": sha256(final_map),
             "metrics_sha256": sha256(metrics),
+            "iteration_history_sha256": sha256(history),
+            "checkpoint_field_map_sha256": (
+                sha256(checkpoint) if checkpoint.is_file() else None
+            ),
             "plots": plots,
         }
         (run_directory / "manifest.json").write_text(
@@ -362,6 +503,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(f"run directory: {run_directory}")
     print(f"metrics:       {metrics}")
+    print(f"history:       {history}")
     if plots:
         print(f"plots:         {run_directory / 'plots'}")
     return 0

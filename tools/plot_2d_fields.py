@@ -28,6 +28,11 @@ COMPONENTS = (
     ("yx", 1, 0), ("yy", 1, 1), ("yz", 1, 2),
     ("zx", 2, 0), ("zy", 2, 1), ("zz", 2, 2),
 )
+HARMONIC_COMPONENTS = (
+    ("++", 0, 0), ("+0", 0, 1), ("+-", 0, 2),
+    ("0+", 1, 0), ("00", 1, 1), ("0-", 1, 2),
+    ("-+", 2, 0), ("-0", 2, 1), ("--", 2, 2),
+)
 
 WHITE_INDIGO = LinearSegmentedColormap.from_list(
     "fermiforge_white_indigo",
@@ -57,8 +62,9 @@ class FieldMap:
 def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Plot nine order-parameter amplitudes, cosines of their phases, "
-            "pair density, and current components from a FermiForge 2D map."
+            "Plot Cartesian and spherical/harmonic order-parameter "
+            "amplitudes and phase cosines, pair density, and current "
+            "components from a FermiForge 2D map."
         )
     )
     parser.add_argument("field_map", type=Path, help="FermiForge 2D ASCII map")
@@ -193,19 +199,67 @@ def style_axes(axis: plt.Axes, x_label: bool, y_label: bool) -> None:
     axis.tick_params(direction="out", length=3, width=0.8)
 
 
-def plot_amplitudes(field_map: FieldMap) -> plt.Figure:
-    amplitudes = np.abs(field_map.order_parameter)
+def cartesian_to_harmonics(order_parameter: np.ndarray) -> np.ndarray:
+    """Apply the authoritative new_src Cartesian-to-(+,0,-) transform."""
+    dxx, dxy, dxz = (
+        order_parameter[0, 0],
+        order_parameter[0, 1],
+        order_parameter[0, 2],
+    )
+    dyx, dyy, dyz = (
+        order_parameter[1, 0],
+        order_parameter[1, 1],
+        order_parameter[1, 2],
+    )
+    dzx, dzy, dzz = (
+        order_parameter[2, 0],
+        order_parameter[2, 1],
+        order_parameter[2, 2],
+    )
+    inverse_sqrt_two = 1.0 / np.sqrt(2.0)
+    harmonic = np.empty_like(order_parameter)
+
+    # Indices are ordered (+,0,-), matching new_src/op_harm and the modern
+    # Fortran order_parameter_basis module.
+    harmonic[2, 2] = 0.5 * (dxx - dyy + 1j * (dxy + dyx))
+    harmonic[2, 1] = inverse_sqrt_two * (dxz + 1j * dyz)
+    harmonic[2, 0] = 0.5 * (dxx + dyy - 1j * (dxy - dyx))
+    harmonic[1, 2] = inverse_sqrt_two * (dzx + 1j * dzy)
+    harmonic[1, 1] = dzz
+    harmonic[1, 0] = inverse_sqrt_two * (dzx - 1j * dzy)
+    harmonic[0, 2] = 0.5 * (dxx + dyy + 1j * (dxy - dyx))
+    harmonic[0, 1] = inverse_sqrt_two * (dxz - 1j * dyz)
+    harmonic[0, 0] = 0.5 * (dxx - dyy - 1j * (dxy + dyx))
+
+    cartesian_norm = np.sum(np.abs(order_parameter) ** 2, axis=(0, 1))
+    harmonic_norm = np.sum(np.abs(harmonic) ** 2, axis=(0, 1))
+    norm_scale = max(float(np.nanmax(cartesian_norm)), 1.0)
+    if float(np.nanmax(np.abs(cartesian_norm - harmonic_norm))) > (
+        512.0 * np.finfo(float).eps * norm_scale
+    ):
+        raise PlotError("Cartesian-to-harmonic conversion failed its norm check")
+    return harmonic
+
+
+def plot_basis_amplitudes(
+    x: np.ndarray,
+    y: np.ndarray,
+    order_parameter: np.ndarray,
+    components: Sequence[tuple[str, int, int]],
+    title: str,
+) -> plt.Figure:
+    amplitudes = np.abs(order_parameter)
     maximum = float(np.nanmax(amplitudes))
     if not np.isfinite(maximum) or maximum <= 0.0:
         maximum = 1.0
 
     figure, axes = plt.subplots(3, 3, figsize=(10.6, 9.4), constrained_layout=True)
     image = None
-    for name, spin, orbital in COMPONENTS:
+    for name, spin, orbital in components:
         axis = axes[spin, orbital]
         image = axis.pcolormesh(
-            field_map.x,
-            field_map.y,
+            x,
+            y,
             amplitudes[spin, orbital],
             shading="auto",
             cmap=WHITE_INDIGO,
@@ -218,30 +272,47 @@ def plot_amplitudes(field_map: FieldMap) -> plt.Figure:
     assert image is not None
     colorbar = figure.colorbar(image, ax=axes, shrink=0.92, pad=0.02)
     colorbar.set_label("amplitude (common scale)")
-    figure.suptitle("Order-parameter amplitude")
+    figure.suptitle(title)
     return figure
 
 
-def plot_phase_cosines(field_map: FieldMap, mask_fraction: float) -> plt.Figure:
-    amplitudes = np.abs(field_map.order_parameter)
+def plot_amplitudes(field_map: FieldMap) -> plt.Figure:
+    return plot_basis_amplitudes(
+        field_map.x,
+        field_map.y,
+        field_map.order_parameter,
+        COMPONENTS,
+        "Order-parameter amplitude - Cartesian basis",
+    )
+
+
+def plot_basis_phase_cosines(
+    x: np.ndarray,
+    y: np.ndarray,
+    order_parameter: np.ndarray,
+    components: Sequence[tuple[str, int, int]],
+    mask_fraction: float,
+    title: str,
+) -> plt.Figure:
+    amplitudes = np.abs(order_parameter)
     common_maximum = float(np.nanmax(amplitudes))
     threshold = max(0.0, mask_fraction) * common_maximum
 
     figure, axes = plt.subplots(3, 3, figsize=(10.6, 9.4), constrained_layout=True)
     image = None
-    for name, spin, orbital in COMPONENTS:
+    for name, spin, orbital in components:
         amplitude = amplitudes[spin, orbital]
         phase_cosine = np.full_like(amplitude, np.nan, dtype=float)
         np.divide(
-            field_map.order_parameter[spin, orbital].real,
+            order_parameter[spin, orbital].real,
             amplitude,
             out=phase_cosine,
             where=amplitude > threshold,
         )
         axis = axes[spin, orbital]
         image = axis.pcolormesh(
-            field_map.x,
-            field_map.y,
+            x,
+            y,
             np.ma.masked_invalid(phase_cosine),
             shading="auto",
             cmap=BLUE_WHITE_RED,
@@ -255,8 +326,19 @@ def plot_phase_cosines(field_map: FieldMap, mask_fraction: float) -> plt.Figure:
     colorbar = figure.colorbar(image, ax=axes, shrink=0.92, pad=0.02)
     colorbar.set_ticks((-1.0, -0.5, 0.0, 0.5, 1.0))
     colorbar.set_label(r"$\cos(\mathrm{phase})$")
-    figure.suptitle("Order-parameter phase cosine (grey: phase undefined)")
+    figure.suptitle(title + " (grey: phase undefined)")
     return figure
+
+
+def plot_phase_cosines(field_map: FieldMap, mask_fraction: float) -> plt.Figure:
+    return plot_basis_phase_cosines(
+        field_map.x,
+        field_map.y,
+        field_map.order_parameter,
+        COMPONENTS,
+        mask_fraction,
+        "Order-parameter phase cosine - Cartesian basis",
+    )
 
 
 def plot_density_and_current(
@@ -378,6 +460,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_arguments(argv)
     try:
         field_map = load_field_map(arguments.field_map)
+        harmonic_order_parameter = cartesian_to_harmonics(
+            field_map.order_parameter
+        )
         output_directory = arguments.output_dir or arguments.field_map.parent / "plots"
         output_directory.mkdir(parents=True, exist_ok=True)
         prefix = safe_prefix(arguments.prefix or arguments.field_map.stem)
@@ -399,6 +484,39 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_directory,
                 prefix,
                 "order_parameter_phase_cosine",
+                arguments.formats,
+                arguments.dpi,
+            )
+        )
+        paths.extend(
+            save_figure(
+                plot_basis_amplitudes(
+                    field_map.x,
+                    field_map.y,
+                    harmonic_order_parameter,
+                    HARMONIC_COMPONENTS,
+                    "Order-parameter amplitude - spherical/harmonic basis",
+                ),
+                output_directory,
+                prefix,
+                "order_parameter_harmonic_amplitude",
+                arguments.formats,
+                arguments.dpi,
+            )
+        )
+        paths.extend(
+            save_figure(
+                plot_basis_phase_cosines(
+                    field_map.x,
+                    field_map.y,
+                    harmonic_order_parameter,
+                    HARMONIC_COMPONENTS,
+                    arguments.phase_mask_fraction,
+                    "Order-parameter phase cosine - spherical/harmonic basis",
+                ),
+                output_directory,
+                prefix,
+                "order_parameter_harmonic_phase_cosine",
                 arguments.formats,
                 arguments.dpi,
             )

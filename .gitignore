@@ -16,6 +16,21 @@ __pycache__/
 .venv/
 venv/
 
+# LaTeX intermediates.  The editable source remains under
+# docs/technical_note; the canonical rendered PDF is kept under output/pdf.
+/docs/technical_note/*.aux
+/docs/technical_note/*.bbl
+/docs/technical_note/*.bcf
+/docs/technical_note/*.blg
+/docs/technical_note/*.fdb_latexmk
+/docs/technical_note/*.fls
+/docs/technical_note/*.log
+/docs/technical_note/*.out
+/docs/technical_note/*.pdf
+/docs/technical_note/*.run.xml
+/docs/technical_note/*.synctex.gz
+/docs/technical_note/*.toc
+
 # Fortran, CMake, Ninja, and compiler products
 *.o
 *.mod
@@ -42,9 +57,10 @@ build-*/
 /tmp/
 /runs/
 
-# Local convenience wrapper. The maintained publisher is
-# tools/upload_to_git.sh, whose canonical default is GitHub.
-/push_to_github.sh
+# Large local legacy 2D reference fields. Their provenance and compact
+# validation metadata are documented in the repository, but the raw fields
+# are kept in external archival storage.
+/2D_benchmarks/
 
 # Products generated in the active transitional radial source directory.
 # Suffixed historical reference datasets remain trackable.

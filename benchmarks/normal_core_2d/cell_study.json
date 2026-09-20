@@ -1,0 +1,50 @@
+{
+  "shared": {
+    "input": "examples/2d_normal_core_multiscale.nml",
+    "ranks": 10,
+    "jobs": 10,
+    "plot": true,
+    "maximum_iterations": 60,
+    "convergence_tolerance": 2e-6,
+    "anderson_history_limit": 10,
+    "anderson_progress_threshold": 0.1,
+    "anderson_maximum_mixing": 5.0,
+    "checkpoint_interval": 5,
+    "initial_perturbation_amplitude": 0.0,
+    "initial_perturbation_radius": 3.0
+  },
+  "comparison_radius": 7.0,
+  "cases": [
+    {
+      "name": "cell-r12-active-r9",
+      "half_width": 12.0,
+      "active_radius": 9.0,
+      "fine_region_half_width": 3.0,
+      "medium_region_half_width": 7.0,
+      "fine_spacing": 0.5,
+      "medium_spacing": 1.0,
+      "coarse_spacing": 2.5,
+      "asymptotic_outer_radius": 70.0,
+      "trajectory_maximum_step": 0.25
+    },
+    {
+      "name": "cell-r18-active-r15",
+      "half_width": 18.0,
+      "active_radius": 15.0,
+      "fine_region_half_width": 3.0,
+      "medium_region_half_width": 7.0,
+      "fine_spacing": 0.5,
+      "medium_spacing": 1.0,
+      "coarse_spacing": 2.5,
+      "asymptotic_outer_radius": 70.0,
+      "trajectory_maximum_step": 0.25
+    }
+  ],
+  "acceptance": {
+    "maximum_normalization_error": 1e-10,
+    "maximum_qcv_gap_relative_l2": 0.05,
+    "maximum_qcv_current_relative_l2": 0.05,
+    "maximum_cell_gap_relative_l2": 0.01,
+    "maximum_cell_current_relative_l2": 0.01
+  }
+}

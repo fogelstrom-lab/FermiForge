@@ -12,7 +12,8 @@ program test_he3_mpi_field_map
   use he3_mpi_field_map_2d, only : he3_mpi_field_map_diagnostics_t, &
                                    evaluate_mpi_he3_field_map, &
                                    update_mpi_he3_state_with_anderson
-  use new_src_iteration_layout_2d, only : new_src_iteration_vector_size_2d
+  use new_src_iteration_layout_2d, only : &
+    new_src_masked_iteration_vector_size_2d
   use legacy_anderson_mixing, only : legacy_anderson_t, anderson_report_t
   use he3_nonlinear_iteration_2d, only : he3_field_residual_report_t
   use free_vortex_asymptotic_2d, only : free_vortex_endpoint_2d_t
@@ -87,10 +88,11 @@ program test_he3_mpi_field_map
     0.2_rk, masked_mapped, masked_diagnostics, masked_succeeded, &
     free_vortex_endpoint=endpoint, active_point_mask=active_point)
   if (rank == 0) call accelerator%initialize( &
-    new_src_iteration_vector_size_2d(state), 5, 0.1_rk, 5.0_rk)
+    new_src_masked_iteration_vector_size_2d(state, active_point), &
+    5, 0.1_rk, 5.0_rk)
   call update_mpi_he3_state_with_anderson( &
-    MPI_COMM_WORLD, mesh, accelerator, state, mpi_mapped, 0.0_rk, next, &
-    anderson_report, residual_report)
+    MPI_COMM_WORLD, mesh, accelerator, state, masked_mapped, 0.0_rk, next, &
+    anderson_report, residual_report, active_point)
   passed = mpi_succeeded
   passed = passed .and. mpi_diagnostics%rank_count == rank_count
   passed = passed .and. &
@@ -119,13 +121,14 @@ program test_he3_mpi_field_map
   passed = passed .and. anderson_report%iteration == 1 .and. &
     anderson_report%history_size == 1
   passed = passed .and. residual_report%value_count == &
-    21 * mesh%point_count()
+    21 * count(active_point)
   passed = passed .and. maxval(abs(next%order_parameter - &
     (state%order_parameter + cmplx(0.01_rk, 0.0_rk, rk) * &
-     (mpi_mapped%order_parameter - state%order_parameter)))) < 3.0e-15_rk
+     (masked_mapped%order_parameter - state%order_parameter)))) < 3.0e-15_rk
   passed = passed .and. maxval(abs(next%current_mean_field - &
     (state%current_mean_field + 0.01_rk * &
-     (mpi_mapped%current_mean_field - state%current_mean_field)))) < 3.0e-15_rk
+     (masked_mapped%current_mean_field - &
+      state%current_mean_field)))) < 3.0e-15_rk
 
   if (rank == 0) then
     call evaluate_serial_he3_field_map( &
