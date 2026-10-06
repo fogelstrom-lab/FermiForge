@@ -70,9 +70,10 @@ must be fixed by the benchmark setup.
   stages are insufficient.
 - Repeat both full cases with at least one and ten ranks and declare tolerances
   below the output formatting precision.
-- Make `new_src` execute an explicit free/specular-cylinder boundary strategy.
-  At present it reads `icyl`, but only calls `intord_v`, so its cylinder flag has
-  no transport effect.
+- Validate the restored `new_src` specular-cylinder branch. As of 2026-10-06,
+  `icyl=1` selects reflected trajectory sampling with an explicit radius;
+  bounded sampling/map tests pass, but a converged cylinder comparison remains.
+  See `docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md`.
 - Compare the modern result against the accepted legacy fields and selected
   integrated observables after grid, trajectory-step, angle, and energy
   convergence.

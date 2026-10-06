@@ -46,7 +46,11 @@ contains
 
          do it = 1, tmax, 1
             do ip = 1, 11, 1
-               call intord_v(it,ip,iy,sem)
+               if (cyl) then
+                  call intord_c(it,ip,iy,sem)
+               else
+                  call intord_v(it,ip,iy,sem)
+               end if
                do ien= 1, Ncmax, 1
                   en = zp(ien)
                   call makeprops(it,ip,ien,en,sem,tem)

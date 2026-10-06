@@ -163,6 +163,15 @@ directly compares their common inner-grid values, and writes CSV and JSON
 acceptance reports. The supplied calculation is intentionally a long
 production run, not a smoke test.
 
+## Rotationally symmetric cylindrical confinement
+
+The active `new_src` radial solver supports `icyl=1` with a cylinder radius
+appended after AA `p_max`. It uses the modernized specular trajectory routines
+and interpolates the mean fields along the reflected rays. This is an
+experimental axisymmetric path; the full 2D confinement backend and converged
+surface benchmark remain to be validated. Input, short checks, and numerical
+limits are in `docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md`.
+
 ## Import a legacy full-2D state
 
 Large legacy `op_x`, `op_y`, `op_z`, and `curr` datasets are kept outside Git.

@@ -28,7 +28,7 @@ LDFLAGS += $(EXTRA_LDFLAGS)
 LDLIBS  += $(EXTRA_LDLIBS)
 
 OBJ = he3_kinds.o legacy_anderson_mixing.o global_dec.o bulkgap.o \
-	init_calc.o mpicalls.o interpol.o riccati.o getnewses.o packses.o \
+	init_calc.o mpicalls.o trajectories.o interpol.o riccati.o getnewses.o packses.o \
 	iter_AA.o iter.o qcv.o
 
 .DELETE_ON_ERROR:
@@ -50,7 +50,10 @@ legacy_anderson_mixing.o: ../src/legacy_anderson_mixing.f90 he3_kinds.o Makefile
 bulkgap.o: global_dec.o
 init_calc.o: global_dec.o bulkgap.o
 mpicalls.o: global_dec.o
-interpol.o: global_dec.o
+trajectories.o: 3DFS_MPICodes/trajectories.f90 Makefile
+	$(MPIFC) $(FFLAGS) -c $< -o $@
+
+interpol.o: global_dec.o trajectories.o
 riccati.o: global_dec.o
 getnewses.o: global_dec.o interpol.o riccati.o
 packses.o: global_dec.o

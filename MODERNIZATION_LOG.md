@@ -2273,3 +2273,29 @@ Homebrew GNU Fortran compiler. CMake found and built the MPI layer, all 32 tests
 passed including the one-, four-, and ten-rank MPI checks, and Python syntax
 validation passed for all 19 maintained tools. The dry run created no commit
 and contacted no remote.
+
+## 2026-10-06 - Axisymmetric specular cylinder option in new_src
+
+Restored the contained transport branch in the active free-form radial solver.
+Previously `icyl` was read and broadcast, but `getnewop` always called the free
+sampler. `icyl=1` now requires an explicit radius after AA `p_max`, creates a
+100-node uniform radial grid ending at the wall, and selects `intord_c`.
+The sampler uses the modernized `3DFS_MPICodes/trajectories.f90` geometry and
+contracts interpolated mean fields with the local reflected momentum. The
+Riccati solver is unchanged. Exact wall interpolation uses the final three
+physical nodes, and confined restarts check their radial coordinates.
+
+The isolated build runner includes the new module, parses the radius, and
+records the confined mesh/boundary in metadata. Free inputs and their tangent
+grid/tail remain unchanged. Four-node free sampling and one-pole propagator
+probes were byte-identical to an isolated pre-change build.
+
+Short checks passed with bounds checking and floating-point traps: analytic
+quadratic-gap/linear-current sampling at core/interior/wall nodes, exact wall
+interpolation, finite reduced-quadrature maps at radii 4 and 6, and rejection
+of invalid radius or mismatched restart. Geometry still matches the original
+fixed-form routines in both default-real and real-8 modes. No long calculation
+was launched; this is an experimental confinement branch, not a converged
+surface benchmark. Finite-path endpoints, reflection-step convergence, the
+legacy wall displacement and grazing policy, and the full 2D boundary backend
+remain explicit gates in `docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md`.

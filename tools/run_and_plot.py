@@ -58,6 +58,7 @@ NEW_BUILD_FILES = (
     "bulkgap.f90",
     "init_calc.f90",
     "mpicalls.f90",
+    "3DFS_MPICodes/trajectories.f90",
     "interpol.f90",
     "riccati.f90",
     "getnewses.f90",
@@ -250,6 +251,7 @@ def copy_new_build_inputs(build_dir: Path) -> None:
         source = NEW_SOURCE / name
         if not source.is_file():
             raise RunnerError(f"missing new_src build input: {source}")
+        (build_dir / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, build_dir / name)
     for name in SHARED_BUILD_FILES:
         source = SHARED_SOURCE / name
@@ -347,6 +349,13 @@ def read_new_input_summary(input_path: Path) -> Dict[str, object]:
     }
     if len(lines) >= 10:
         summary["anderson_p_max"] = first_numeric_token(lines[9])
+    if summary["cylindrical"] == 1:
+        if len(lines) < 11:
+            raise RunnerError("new_src icyl=1 requires record 11: cylinder radius")
+        radius = first_numeric_token(lines[10])
+        if not math.isfinite(radius) or radius <= 0:
+            raise RunnerError("cylinder radius must be finite and positive")
+        summary["radius_legacy_units"] = radius
     return summary
 
 
@@ -504,6 +513,19 @@ def run_solver(args: argparse.Namespace) -> Path:
                 "warning": (
                     "This executable uses the legacy fixed 49-cell uniform radial "
                     "grid; it does not yet exercise adaptive refinement."
+                ),
+            }
+        )
+    elif parameters["cylindrical"] == 1:
+        metadata.update(
+            {
+                "mesh": "static uniform radial grid in a specular cylinder",
+                "radial_cells": 99,
+                "uniform_radial_spacing": float(parameters["radius_legacy_units"]) / 99,
+                "boundary": "specular cylinder side wall; no end caps",
+                "warning": (
+                    "This is an experimental axisymmetric confinement calculation; "
+                    "wall, trajectory-step, and finite-path convergence remain to be checked."
                 ),
             }
         )

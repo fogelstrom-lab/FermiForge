@@ -1,0 +1,11 @@
+0.30                  : T/Tc (matching Ozaki table required)
+1.0                   : vorticity
+1                     : icyl (specular cylinder)
+5.40                  : F1s
+2                     : azimuthal directions (smoke only)
+1.e-2                 : requested residual tolerance
+1                     : A-core seed, no restart files required
+3                     : Anderson mixing
+0                     : main iteration limit (legacy NN startup still runs)
+1.0                   : AA p_max
+4.0                   : cylinder radius in existing solver length units

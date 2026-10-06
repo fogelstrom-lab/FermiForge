@@ -1,5 +1,7 @@
 Module Interpolations
    use Global_variables
+   use cylindrical_trajectories, only : trajectories
+   implicit none
 contains
 !---------------------------------------------------------------------
 !
@@ -77,6 +79,67 @@ contains
 !---------------------------------------------------------------------
 !
    end subroutine intord_v
+
+   subroutine intord_c(it,ip,iy,sem)
+      ! Source-compatible specular cylinder sampling. Riccati amplitudes
+      ! propagate along the unfolded reflected path without a wall reset.
+      integer, intent(in) :: it, ip, iy
+      complex, intent(out) :: sem(4,-mx:mx)
+      real :: origin, sx, sy, sz, sd
+      real :: bx(0:mx), by(0:mx), bz(0:mx)
+      real :: fx(0:mx), fy(0:mx), fz(0:mx)
+      real :: bpx(0:mx), bpy(0:mx), bpz(0:mx)
+      real :: fpx(0:mx), fpy(0:mx), fpz(0:mx)
+      integer :: ix
+
+      sz = kz(ip)
+      sd = sqrt(1.0-sz*sz)
+      sx = kx(it)*sd
+      sy = ky(it)*sd
+      origin = xgrid(iy)
+      ! The legacy trajectory routine cannot start exactly on the wall.
+      ! Evaluate that node as an interior limit, retaining the wall field
+      ! in interpolation. This displacement needs a convergence study.
+      if (iy == nx) origin = Rx-1.0e-7*dx
+      call trajectories(origin,0.0,0.0,sx,sy,sz,Rx,Rx*Rx,dx,mx, &
+         bx,by,bz,fx,fy,fz,bpx,bpy,bpz,fpx,fpy,fpz)
+
+      do ix=0,mx
+         call sample_cylinder_self_energy(fx(ix),fy(ix), &
+            fpx(ix),fpy(ix),fpz(ix),sem(:,ix))
+      end do
+      ! Backward positions are indexed outwards, but their stored momentum
+      ! points toward the target. Do not negate it a second time.
+      do ix=1,mx
+         call sample_cylinder_self_energy(bx(ix),by(ix), &
+            bpx(ix),bpy(ix),bpz(ix),sem(:,-ix))
+      end do
+   end subroutine intord_c
+
+   subroutine sample_cylinder_self_energy(x,y,sx,sy,sz,sem)
+      real, intent(in) :: x,y,sx,sy,sz
+      complex, intent(out) :: sem(4)
+      real :: r, ph, px, py
+      complex :: dummy, intses(10)
+
+      r = sqrt(x*x+y*y)
+      if (r > Rx*(1.0+1.0e-9)) error stop 'Reflected trajectory escaped cylinder'
+      ! Clamp only roundoff at the wall, never extrapolate a free-vortex tail.
+      r = min(r,Rx)
+      px = 0.0
+      py = 0.0
+      ph = 0.0
+      if (r > 1.0e-6) then
+         px = -y/r
+         py = x/r
+         ph = atan2(y,x)
+      end if
+      dummy = intpol(r,ph,intses,1)
+      sem(1) = intses(1)*sx+intses(2)*sy+intses(3)*sz
+      sem(2) = intses(4)*sx+intses(5)*sy+intses(6)*sz
+      sem(3) = intses(7)*sx+intses(8)*sy+intses(9)*sz
+      sem(4) = intses(10)*aa0*(px*sx+py*sy)
+   end subroutine sample_cylinder_self_energy
 !
 !---------------------------------------------------------------------
 !
@@ -105,8 +168,14 @@ contains
 
 !     if(icomp.eq.0) goto 10 ! Extrapolating for a free vortex
 
-      y = atan(x/Rx)/tx 
-      iz=int(y)
+      if (cyl) then
+         y = min(max(x,0.0),Rx)/dx
+         ! Use the final three physical nodes for wall interpolation.
+         iz = min(int(y),nx-1)
+      else
+         y = atan(x/Rx)/tx
+         iz=int(y)
+      end if
       if(iz >= nx) print *, ' something is wrong...',iz,x-xgrid(nx)
       if(iz <  0) print *, ' something is wrong...',iz,x
       ip=iz+1

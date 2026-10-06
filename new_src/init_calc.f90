@@ -1,6 +1,7 @@
 Module Initialisation
    use Global_variables
    use Bulkop
+   use, intrinsic :: ieee_arithmetic, only : ieee_is_finite
    implicit none
 contains
 !--------------------------------------------------------------------------
@@ -12,7 +13,7 @@ contains
 ! --  Get the input and rig the calculation
 !     
       integer :: i,j,ix,ien,input_status
-      real ::  x,y,z,d,phi,dv,temp, tol, gridM
+      real ::  x,y,z,d,phi,dv,temp, tol, gridM, restart_radius, current_radius
       real ::  a1x,b1x,a1y,b1y,a1z,b1z
       real ::  a2x,b2x,a2y,b2y,a2z,b2z
       real ::  a3x,b3x,a3y,b3y,a3z,b3z
@@ -36,20 +37,35 @@ contains
       if (aa_pmax < 0.01) then
          error stop 'AA p_max must be at least 0.01'
       end if
+      if (icyl /= 0 .and. icyl /= 1) error stop 'icyl must be 0 (free) or 1 (cylinder)'
+      cyl = icyl == 1
 !      
 !--- Some constants
 !      
       gridM = 70.0
       Rx = 10.0
       tx = atan(gridM/Rx)/float(nx)
+      if (cyl) then
+         ! Record 11 follows AA p_max; Rx is the physical wall radius here.
+         read (*,*,iostat=input_status) Rx
+         if (input_status /= 0) error stop 'icyl=1 requires a cylinder radius after AA p_max'
+         if (.not. ieee_is_finite(Rx)) error stop 'Cylinder radius must be finite'
+         if (Rx <= 0.0) error stop 'Cylinder radius must be positive'
+         gridM = Rx
+      end if
 
       open(1,file='xgrid.dat',status='unknown')
       do i = 0, nx, 1
-         xgrid(i)=Rx*tan(tx*i)
+         if (cyl) then
+            xgrid(i)=Rx*real(i)/real(nx)
+         else
+            xgrid(i)=Rx*tan(tx*i)
+         end if
          write(1,*) i,xgrid(i)
       end do
       close(1)
       dx = 2.0*gridM/float(mx)
+      if (cyl) dx = Rx/real(nx)
 
       t = temp 
       errtol = tol
@@ -57,8 +73,6 @@ contains
 
       pwave=.false.
       dwave=.false.
-      cyl=.false.
-      if(icyl.eq.1) cyl=.true.
       pwave=.true.
 !        
 !--- Get the Ozaki parameters
@@ -131,6 +145,12 @@ contains
          open(3,file='curr',status='unknown')
          do ix=0,nx,1
             read(1,*) x,a1x,b1x,a1y,b1y,a1z,b1z,a2x,b2x,a2y,b2y,a2z,b2z,a3x,b3x,a3y,b3y,a3z,b3z
+            restart_radius = x
+            if (cyl) then
+               ! Existing text checkpoints round radii to three decimals.
+               if (abs(restart_radius-xgrid(ix)) > 5.1e-4) &
+                  error stop 'Cylinder restart order-parameter grid does not match radius'
+            end if
             dxx(ix)=cmplx(a1x,b1x)
             dxy(ix)=cmplx(a1y,b1y)
             dxz(ix)=cmplx(a1z,b1z)
@@ -140,7 +160,11 @@ contains
             dzx(ix)=cmplx(a3x,b3x)
             dzy(ix)=cmplx(a3y,b3y)
             dzz(ix)=cmplx(a3z,b3z)
-            read(3,*) x,x,a1x,a1y,a1z
+            read(3,*) current_radius,x,a1x,a1y,a1z
+            if (cyl) then
+               if (abs(current_radius-xgrid(ix)) > 5.1e-4) &
+                  error stop 'Cylinder restart mean-field grid does not match radius'
+            end if
             vx(ix)=cmplx(a1x,0.0)
             vy(ix)=cmplx(a1y,0.0)
             vz(ix)=cmplx(a1z,0.0)
@@ -191,6 +215,10 @@ contains
       print 5051, '     As1(Fs1)                   : ',aa0,'   (',aa0/(1.-aa0/3.0),')'
       print 5050, ' Delta(T)                       : ',deltat
       print 5000, ' Grid radius                    : ',xgrid(nx)
+      if (cyl) then
+         print 5000, ' Specular cylinder radius       : ',Rx
+         print 5000, ' Reflected half-path length     : ',mx*dx
+      end if
       print 5000, ' integration step               : ',dx
       print 5100, ' Accuracy                       : ',errtol
       print 5200, ' Nr. of trajs                   : ',tmax
