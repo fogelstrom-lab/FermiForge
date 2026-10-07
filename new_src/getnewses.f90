@@ -1,7 +1,6 @@
 MODULE NewSES
    use global_variables
    use MPI_variables
-   use MPI_variables
    use Interpolations
    use riccati
 contains
@@ -19,9 +18,11 @@ contains
       complex, dimension(0:nx) :: dlxx, dlxy, dlxz
       complex, dimension(0:nx) :: dlyx, dlyy, dlyz
       complex, dimension(0:nx) :: dlzx, dlzy, dlzz, lvx, lvy, lvz
-      complex, dimension(4,-mx:mx) :: sem
+      complex, allocatable :: sem(:,:)
       complex, dimension(12) :: tem
  
+      ! Local heap storage, automatically released on return; retain bounds.
+      allocate(sem(4,-mx:mx))
       tlnt=esum !t/log(t)
 
       dlxx = czero

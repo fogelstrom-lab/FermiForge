@@ -6,7 +6,7 @@ program test_axial_radial_embedding
   use bilinear_field_sampler_2d, only : sample_spinful_state_2d
   use order_parameter_basis, only : projection_plus, projection_zero, &
                                     projection_minus, &
-                                    axial_harmonics_to_transport_cartesian
+                                    axial_harmonics_to_cartesian
   use axial_radial_embedding, only : axial_radial_profile_t, &
                                      allocate_axial_radial_profile, &
                                      sample_axial_radial_profile, &
@@ -60,7 +60,7 @@ contains
     harmonic(projection_minus, projection_plus) = &
       cmplx(radius, 0.0_rk, kind=rk) * &
       exp(cmplx(0.0_rk, angle, kind=rk))
-    call axial_harmonics_to_transport_cartesian(harmonic, expected)
+    call axial_harmonics_to_cartesian(harmonic, expected)
 
     call sample_axial_radial_profile(mesh, profile, x, y, 1.0_rk, actual, &
                                      actual_mean, inside)

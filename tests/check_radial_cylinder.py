@@ -3,6 +3,7 @@
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +28,12 @@ def main():
             "global_dec.f90", "bulkgap.f90", "init_calc.f90", "mpicalls.f90")]
         sources += [geometry, NEW / "interpol.f90", NEW / "riccati.f90",
                     NEW / "getnewses.f90", ROOT / "tests/test_radial_cylinder_map.f90"]
-        subprocess.run([*flags, *map(str, sources), "-o", str(executable)],
+        # On macOS the MPI-linked probe SIGILLs with GNU FP traps enabled;
+        # the same probe passes without them. Keep bounds and explicit finite
+        # checks for this probe, and retain FP traps in the non-MPI sampler.
+        map_flags = [flag for flag in flags
+                     if sys.platform != "darwin" or not flag.startswith("-ffpe-trap=")]
+        subprocess.run([*map_flags, *map(str, sources), "-o", str(executable)],
                        cwd=work, check=True)
         shutil.copy2(NEW / "gauss11.dat", work / "gauss11.dat")
         shutil.copy2(NEW / "ozaki_T=0.3.dat", work / "ozaki.dat")
@@ -42,6 +48,14 @@ def main():
             assert len(rows) == 100
             assert float(rows[-1].split()[0]) == radius
             print(f"PASS: radius {radius:g} reduced-quadrature cylinder map")
+            expected = (work / "cylinder_map.dat").read_bytes()
+            extended = records[:3]+["40.0", "4.0"]+records[3:]
+            result = subprocess.run([str(executable)], input="\n".join(extended)+"\n",
+                                    text=True, cwd=work, capture_output=True, timeout=60)
+            if result.returncode:
+                raise RuntimeError(result.stdout + result.stderr)
+            assert (work / "cylinder_map.dat").read_bytes() == expected
+            print("PASS: legacy and explicit-grid cylinder inputs give identical maps")
         # Reject silent use of a restart on an unrelated radial grid.
         records[6] = "3"
         records[10] = "4.0"

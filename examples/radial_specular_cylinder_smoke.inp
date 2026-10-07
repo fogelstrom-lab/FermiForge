@@ -8,4 +8,4 @@
 3                     : Anderson mixing
 0                     : main iteration limit (legacy NN startup still runs)
 1.0                   : AA p_max
-4.0                   : cylinder radius in existing solver length units
+4.0                   : cylinder radius in zero-temperature coherence lengths xi_0

@@ -1,4 +1,6 @@
 module he3_mpi_field_map_2d
+  use barzilai_borwein_mixing, only: bb_mixing_t
+  use polyak_mixing, only: polyak_mixing_t
   use mpi_f08
   use he3_kinds, only : rk
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
@@ -184,7 +186,7 @@ contains
 
   subroutine update_mpi_he3_state_with_anderson( &
       communicator, mesh, accelerator, current, mapped, tolerance, next, &
-      anderson_report, residual_report, active_point_mask)
+      anderson_report, residual_report, active_point_mask, simple_mixing, bb, polyak)
     type(MPI_Comm), intent(in) :: communicator
     type(cartesian_mesh_2d_t), intent(in) :: mesh
     type(legacy_anderson_t), intent(inout) :: accelerator
@@ -194,6 +196,9 @@ contains
     type(anderson_report_t), intent(out) :: anderson_report
     type(he3_field_residual_report_t), intent(out) :: residual_report
     logical, intent(in), optional :: active_point_mask(:)
+    real(rk), intent(in), optional :: simple_mixing
+    type(bb_mixing_t), intent(inout), optional :: bb
+    type(polyak_mixing_t), intent(inout), optional :: polyak
 
     integer :: anderson_integers(4), ierr, rank, residual_integers(2)
     real(rk) :: anderson_reals(4), residual_reals(6)
@@ -204,11 +209,11 @@ contains
       if (present(active_point_mask)) then
         call update_he3_state_with_anderson( &
           mesh, accelerator, current, mapped, tolerance, next, &
-          anderson_report, residual_report, active_point_mask)
+          anderson_report, residual_report, active_point_mask, simple_mixing, bb, polyak)
       else
         call update_he3_state_with_anderson( &
           mesh, accelerator, current, mapped, tolerance, next, &
-          anderson_report, residual_report)
+          anderson_report, residual_report, simple_mixing=simple_mixing, bb=bb, polyak=polyak)
       end if
       anderson_integers = [anderson_report%iteration, &
         anderson_report%history_size, anderson_report%discarded_vectors, &

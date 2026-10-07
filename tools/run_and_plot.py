@@ -327,10 +327,29 @@ ITERATION_ENGINES = {
 
 
 def read_new_input_summary(input_path: Path) -> Dict[str, object]:
-    lines = input_path.read_text(encoding="utf-8").splitlines()
+    lines = [re.split(r"[!#:]", line, maxsplit=1)[0].strip()
+             for line in input_path.read_text(encoding="utf-8").splitlines()]
+    lines = [line for line in lines if line]
     if len(lines) < 9:
         raise RunnerError(f"new_src input has fewer than 9 records: {input_path}")
-    engine_number = int(first_numeric_token(lines[7]))
+    cylinder = first_numeric_token(lines[2])
+    if cylinder not in (0, 1):
+        raise RunnerError("icyl must be 0 or 1")
+    if cylinder == 1 and len(lines) not in (11, 13):
+        raise RunnerError("icyl=1 requires a cylinder radius after AA p_max (11 or 13 records)")
+    if cylinder == 0 and len(lines) not in (9, 10, 11, 12):
+        raise RunnerError("free radial input requires 9, 10, 11 or 12 records")
+    offset = 2 if len(lines) >= (13 if cylinder else 11) else 0
+    values = [first_numeric_token(line) for line in lines]
+    if not all(math.isfinite(value) for value in values):
+        raise RunnerError("radial input, including cylinder radius, must be finite")
+    for index in (4, 6, 7, 8):
+        if not values[index+offset].is_integer():
+            raise RunnerError("expected integer radial input record")
+    grid_extent, radial_scale = values[3:5] if offset else (70.0, 10.0)
+    if grid_extent <= 0 or radial_scale <= 0:
+        raise RunnerError("radial grid scales must be positive")
+    engine_number = int(values[7+offset])
     if engine_number not in ITERATION_ENGINES:
         raise RunnerError(
             f"unknown new_src iteration-engine number {engine_number} in {input_path}"
@@ -339,20 +358,22 @@ def read_new_input_summary(input_path: Path) -> Dict[str, object]:
         "temperature_over_tc": first_numeric_token(lines[0]),
         "vorticity": first_numeric_token(lines[1]),
         "cylindrical": int(first_numeric_token(lines[2])),
-        "fermi_liquid_f1s": first_numeric_token(lines[3]),
-        "azimuthal_directions": int(first_numeric_token(lines[4])),
-        "requested_error": first_numeric_token(lines[5]),
-        "initial_state": int(first_numeric_token(lines[6])),
+        "fermi_liquid_f1s": values[3+offset],
+        "azimuthal_directions": int(values[4+offset]),
+        "requested_error": values[5+offset],
+        "initial_state": int(values[6+offset]),
         "iteration_engine_number": engine_number,
         "iteration_engine": ITERATION_ENGINES[engine_number],
-        "maximum_iterations": int(first_numeric_token(lines[8])),
+        "maximum_iterations": int(values[8+offset]),
+        "input_layout": "explicit_grid" if offset else "legacy",
+        "free_grid_extent": grid_extent,
+        "free_radial_scale": radial_scale,
     }
-    if len(lines) >= 10:
-        summary["anderson_p_max"] = first_numeric_token(lines[9])
+    summary["anderson_p_max"] = values[9+offset] if len(lines) >= 10+offset else 1.0
+    if summary["anderson_p_max"] < 0.01:
+        raise RunnerError("AA p_max must be at least 0.01")
     if summary["cylindrical"] == 1:
-        if len(lines) < 11:
-            raise RunnerError("new_src icyl=1 requires record 11: cylinder radius")
-        radius = first_numeric_token(lines[10])
+        radius = values[-1]
         if not math.isfinite(radius) or radius <= 0:
             raise RunnerError("cylinder radius must be finite and positive")
         summary["radius_legacy_units"] = radius

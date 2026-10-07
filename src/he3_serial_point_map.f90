@@ -1,5 +1,6 @@
 module he3_serial_point_map
   use he3_kinds, only : rk
+  use specular_cylinder_2d, only: cylinder_path_t, build_cylinder_path
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
   use spinful_state_2d, only : spinful_state_2d_t
   use straight_trajectory_2d, only : straight_trajectory_2d_t, &
@@ -9,7 +10,7 @@ module he3_serial_point_map
   use legacy_riccati_trajectory_2d, only : &
     propagate_legacy_riccati_path_to_target
   use free_vortex_asymptotic_2d, only : free_vortex_endpoint_2d_t, &
-    extend_with_free_vortex_asymptotic_2d
+    extend_with_free_vortex_asymptotic_2d, sample_free_vortex_asymptotic_state_2d
   use quasiclassical_propagator, only : quasiclassical_propagator_t, &
                                         reconstruct_legacy_quasiclassical_propagator
   use he3_self_consistency_integrand, only : he3_point_map_accumulator_t, &
@@ -61,10 +62,15 @@ contains
     type(he3_point_map_accumulator_t) :: accumulator
     type(quasiclassical_propagator_t) :: propagator
     type(straight_trajectory_2d_t) :: trajectory
+    type(cylinder_path_t) :: reflected
     type(trajectory_self_energy_2d_t) :: propagation_self_energy, self_energy
     complex(rk), allocatable :: coherence_from_entry(:, :)
     complex(rk), allocatable :: coherence_from_exit(:, :)
     complex(rk) :: spectral_energy
+    complex(rk) :: radial_gap(3,3)
+    real(rk) :: position(2), radial_current(3)
+    integer :: sample
+    logical :: inside
     real(rk), allocatable :: propagation_coordinate(:)
     real(rk) :: finish_time, normalization_error, start_time
     integer :: direction, pole, propagation_target, substep_count
@@ -89,6 +95,13 @@ contains
       if (.not. free_vortex_endpoint%is_valid_for(mesh)) &
         error stop "serial point map has an invalid free-vortex endpoint"
     end if
+    if(mesh%cylinder%enabled) then
+      if(use_free_vortex_endpoint) error stop 'cylinder cannot use free-vortex endpoints'
+      if(.not.allocated(state%radial_point)) &
+        error stop 'cylinder currently requires radial symmetry; 2D wall stencil not implemented'
+      if(abs(maxval(state%radial_coordinate)-mesh%cylinder%radius)>1.e-10_rk) &
+        error stop 'cylinder radial support must end at wall'
+    end if
 
     diagnostics = he3_point_map_diagnostics_t()
     diagnostics%direction_count = angular_quadrature%direction_count()
@@ -97,11 +110,49 @@ contains
 
     do direction = 1, angular_quadrature%direction_count()
       call cpu_time(start_time)
+      if(mesh%cylinder%enabled) then
+        call build_cylinder_path(mesh%cylinder,origin,angular_quadrature%momentum(:,direction), &
+          trajectory_maximum_step,reflected)
+        if(allocated(propagation_coordinate)) deallocate(propagation_coordinate)
+        propagation_coordinate=reflected%s
+        propagation_target=reflected%target
+        if(allocated(propagation_self_energy%triplet_pair_potential)) &
+          deallocate(propagation_self_energy%triplet_pair_potential,propagation_self_energy%diagonal_shift)
+        allocate(propagation_self_energy%triplet_pair_potential(3,size(reflected%s)), &
+          propagation_self_energy%diagonal_shift(size(reflected%s)))
+        do sample=1,size(reflected%s)
+          position=reflected%position(:,sample)
+          call state%sample_radial(position(1),position(2),radial_gap,radial_current,inside)
+          if(.not.inside) error stop 'reflected sample outside radial support'
+          propagation_self_energy%triplet_pair_potential(:,sample)= &
+            matmul(radial_gap,reflected%momentum(:,sample))
+          propagation_self_energy%diagonal_shift(sample)= &
+            feedback_scale*dot_product(radial_current,reflected%momentum(:,sample))
+        end do
+      else
       call build_straight_trajectory_2d( &
         mesh, origin, angular_quadrature%momentum(:, direction), &
         trajectory_maximum_step, trajectory)
-      call sample_trajectory_self_energy_2d( &
-        state, trajectory, feedback_scale, self_energy)
+      if(allocated(state%radial_point)) then
+        if(allocated(self_energy%triplet_pair_potential)) &
+          deallocate(self_energy%triplet_pair_potential,self_energy%diagonal_shift)
+        allocate(self_energy%triplet_pair_potential(3,trajectory%sample_count()), &
+          self_energy%diagonal_shift(trajectory%sample_count()))
+        do sample=1,trajectory%sample_count()
+          position=trajectory%origin+trajectory%path_coordinate(sample)*trajectory%momentum(1:2)
+          call state%sample_radial(position(1),position(2),radial_gap,radial_current,inside)
+          if(.not.inside) then
+            if(.not.use_free_vortex_endpoint) error stop 'radial sampling requires asymptotic endpoints'
+            call sample_free_vortex_asymptotic_state_2d( &
+              mesh,state,position,free_vortex_endpoint,radial_gap,radial_current)
+          end if
+          self_energy%triplet_pair_potential(:,sample)=matmul(radial_gap,trajectory%momentum)
+          self_energy%diagonal_shift(sample)=feedback_scale*dot_product(radial_current,trajectory%momentum)
+        end do
+      else
+        call sample_trajectory_self_energy_2d( &
+          state, trajectory, feedback_scale, self_energy)
+      end if
       if (allocated(propagation_coordinate)) deallocate(propagation_coordinate)
       if (use_free_vortex_endpoint) then
         call extend_with_free_vortex_asymptotic_2d( &
@@ -113,6 +164,7 @@ contains
           source=trajectory%path_coordinate)
         propagation_target = trajectory%target_sample
         propagation_self_energy = self_energy
+      end if
       end if
       call cpu_time(finish_time)
       diagnostics%sampling_seconds = diagnostics%sampling_seconds + &

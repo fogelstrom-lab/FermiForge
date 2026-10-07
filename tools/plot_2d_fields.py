@@ -349,6 +349,13 @@ def plot_density_and_current(
     in_plane_magnitude = np.hypot(current_x, current_y)
     current_kind = field_map.metadata.get("current_kind", "current")
     current_label = current_kind.replace("_", " ")
+    is_mean_field = "mean_field" in current_kind
+    vector_symbol = "h" if is_mean_field else "j"
+    figure_title = (
+        "Density and current-related mean-field map"
+        if is_mean_field
+        else "Density and current map"
+    )
 
     figure, axes = plt.subplots(1, 3, figsize=(15.2, 4.8), constrained_layout=True)
 
@@ -393,7 +400,9 @@ def plot_density_and_current(
         angles="xy",
         scale_units="xy",
     )
-    axes[1].set_title(rf"in-plane {current_label}: $|j_\perp|$ and direction")
+    axes[1].set_title(
+        rf"in-plane {current_label}: $|{vector_symbol}_\perp|$ and direction"
+    )
     style_axes(axes[1], True, True)
     figure.colorbar(current_image, ax=axes[1], shrink=0.86, pad=0.02)
 
@@ -403,14 +412,18 @@ def plot_density_and_current(
         and current_maximum > np.finfo(float).tiny
         and axial_limit <= max(0.0, relative_zero_threshold) * current_maximum
     )
-    axial_title = rf"axial {current_label}: $j_z$"
+    axial_title = rf"axial {current_label}: ${vector_symbol}_z$"
     if numerical_zero:
         actual_axial_maximum = axial_limit
         axial_limit = max(
             max(0.0, relative_zero_threshold) * current_maximum,
             np.finfo(float).tiny,
         )
-        axial_title += "\n" + rf"numerical zero; $|j_z|_{{max}}={actual_axial_maximum:.2e}$"
+        axial_title += (
+            "\n"
+            + rf"numerical zero; $|{vector_symbol}_z|_{{max}}="
+            + rf"{actual_axial_maximum:.2e}$"
+        )
     elif not np.isfinite(axial_limit) or axial_limit <= 0.0:
         axial_limit = 1.0
     axial_image = axes[2].pcolormesh(
@@ -427,7 +440,7 @@ def plot_density_and_current(
     style_axes(axes[2], True, True)
     figure.colorbar(axial_image, ax=axes[2], shrink=0.86, pad=0.02)
 
-    figure.suptitle("Density and current map")
+    figure.suptitle(figure_title)
     return figure
 
 

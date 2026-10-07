@@ -1,0 +1,44 @@
+&axisymmetric_core_benchmark
+  core_label = 'single-plus0-T0.30-Fs1-0'
+  half_width = 22.0
+  number_of_cells = 64
+  mesh_kind = 'smooth'
+  smooth_stretch = 2.3
+  trajectory_interpolation_order = 2
+  require_convergence = .false.
+  active_radius = 20.0
+  ! F1s/(1+F1s/3); zero removes Fermi-liquid feedback.
+  feedback_scale = 0.0
+  trajectory_maximum_step = 0.25
+  minimum_substep_count = 1
+  boundary_relaxation_distance = 1.75
+  maximum_embedding_error = 1.0e-12
+  ! Driver requires a radial reference; this is NOT the quadrupole seed
+  ! or a matching-parameter convergence target. Temperature comes from Ozaki.
+  order_parameter_file = 'benchmarks/a_phase_core_2d/reference/current_new_src_T0.30_F1s5.4/op_xyz'
+  current_field_file = 'benchmarks/a_phase_core_2d/reference/current_new_src_T0.30_F1s5.4/curr'
+  radial_grid_kind = 'auto'
+  gauss_file = 'benchmarks/a_phase_core_2d/reference/current_new_src_T0.30_F1s5.4/gauss11.dat'
+  ozaki_file = 'benchmarks/a_phase_core_2d/reference/current_new_src_T0.30_F1s5.4/ozaki.dat'
+  endpoint_policy = 'state_asymptotic'
+  asymptotic_center_x = 0.0
+  asymptotic_center_y = 0.0
+  asymptotic_bulk_gap = 0.2799
+  asymptotic_winding = 1.0
+  asymptotic_fit_inner_radius = 14.0
+  asymptotic_matching_radius = 17.0
+  asymptotic_outer_radius = 70.0
+  asymptotic_maximum_step = 0.25
+  initialization_mode = 'localized_plus0'
+  seed_core_radius = 5.0
+  seed_amplitude = 1.0
+  restart_field_file = ''
+  initial_perturbation_amplitude = 0.0
+  initial_perturbation_radius = 3.0
+  maximum_iterations = 50
+  convergence_tolerance = 2.0e-6
+  anderson_history_limit = 10
+  anderson_progress_threshold = 0.1
+  anderson_maximum_mixing = 5.0
+  checkpoint_interval = 1
+/

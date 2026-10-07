@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(FermiForge LANGUAGES Fortran)
 
 include(CTest)
+find_package(LAPACK REQUIRED)
 
 option(FERMIFORGE_ENABLE_MPI "Build the MPI field-map execution layer" ON)
 option(FERMIFORGE_REQUIRE_MPI
@@ -17,13 +18,21 @@ if(FERMIFORGE_REQUIRE_MPI AND NOT FERMIFORGE_ENABLE_MPI)
 endif()
 
 add_library(he3_mesh
+  src/barzilai_borwein_mixing.f90
+  src/polyak_mixing.f90
+  src/radial_iteration_diagnostics.f90
   src/he3_kinds.f90
+  src/ozaki_generator.f90
   src/he3_quadrature.f90
+  src/he3_bulk_gap.f90
+  src/he3_fermi_liquid.f90
   src/spin_matrix_2x2.f90
   src/quasiclassical_propagator.f90
   src/he3_self_consistency_integrand.f90
   src/order_parameter_basis.f90
   src/cartesian_mesh_2d.f90
+  src/specular_cylinder_2d.f90
+  src/cylinder_bulk_seed.f90
   src/spinful_state_2d.f90
   src/spinful_field_io_2d.f90
   src/spinful_sparse_state_io_2d.f90
@@ -50,6 +59,7 @@ add_library(he3_mesh
   src/legacy_radial_profile_io.f90
 )
 
+target_link_libraries(he3_mesh PUBLIC ${LAPACK_LIBRARIES})
 set_target_properties(he3_mesh PROPERTIES
   Fortran_STANDARD 2018
   Fortran_STANDARD_REQUIRED YES
@@ -85,7 +95,7 @@ set_target_properties(import_legacy_split_field_map_2d PROPERTIES
 if(FERMIFORGE_ENABLE_MPI)
   find_package(MPI COMPONENTS Fortran QUIET)
   if(MPI_Fortran_FOUND)
-    add_library(he3_mpi_execution src/he3_mpi_field_map_2d.f90)
+    add_library(he3_mpi_execution src/he3_mpi_field_map_2d.f90 src/mpi_shutdown_audit.f90)
     target_link_libraries(he3_mpi_execution PUBLIC he3_mesh MPI::MPI_Fortran)
     set_target_properties(he3_mpi_execution PROPERTIES
       Fortran_STANDARD 2018
@@ -104,6 +114,8 @@ if(FERMIFORGE_ENABLE_MPI)
     add_executable(benchmark_axisymmetric_core_2d
       app/benchmark_axisymmetric_core_2d.f90
     )
+    add_executable(benchmark_radial_cylinder_2d app/benchmark_radial_cylinder_2d.f90)
+    target_link_libraries(benchmark_radial_cylinder_2d PRIVATE he3_mpi_execution)
     target_link_libraries(benchmark_axisymmetric_core_2d
       PRIVATE he3_mpi_execution
     )
@@ -168,6 +180,22 @@ if(FERMIFORGE_ENABLE_MPI)
 endif()
 
 if(BUILD_TESTING)
+  add_executable(test_cylinder_bulk_seed tests/test_cylinder_bulk_seed.f90)
+  target_link_libraries(test_cylinder_bulk_seed PRIVATE he3_mesh)
+  add_test(NAME cylinder_bulk_seed COMMAND test_cylinder_bulk_seed)
+  add_executable(test_specular_cylinder_2d tests/test_specular_cylinder_2d.f90)
+  target_link_libraries(test_specular_cylinder_2d PRIVATE he3_mesh)
+  add_test(NAME specular_cylinder_2d COMMAND test_specular_cylinder_2d)
+  add_executable(test_bb_mixing tests/test_bb_mixing.f90)
+  add_executable(test_polyak_mixing tests/test_polyak_mixing.f90)
+  target_link_libraries(test_polyak_mixing PRIVATE he3_mesh)
+  add_test(NAME polyak_mixing COMMAND test_polyak_mixing)
+  foreach(invalid zero_drag negative_step large_drag nonfinite_step nonfinite_input)
+    add_test(NAME polyak_reject_${invalid} COMMAND test_polyak_mixing ${invalid})
+    set_tests_properties(polyak_reject_${invalid} PROPERTIES WILL_FAIL TRUE)
+  endforeach()
+  target_link_libraries(test_bb_mixing PRIVATE he3_mesh)
+  add_test(NAME bb_mixing COMMAND test_bb_mixing)
   add_executable(test_radial_mesh tests/test_radial_mesh.f90)
   target_link_libraries(test_radial_mesh PRIVATE he3_mesh)
   set_target_properties(test_radial_mesh PROPERTIES
@@ -298,6 +326,9 @@ if(BUILD_TESTING)
     Fortran_EXTENSIONS NO
   )
   add_test(NAME axial_radial_embedding COMMAND test_axial_radial_embedding)
+  add_executable(test_radial_symmetry tests/test_radial_symmetry.f90)
+  target_link_libraries(test_radial_symmetry PRIVATE he3_mesh)
+  add_test(NAME radial_symmetry COMMAND test_radial_symmetry)
 
   add_executable(test_straight_trajectory_2d
     tests/test_straight_trajectory_2d.f90
@@ -391,6 +422,13 @@ if(BUILD_TESTING)
   add_test(NAME he3_trajectory_point_map COMMAND test_he3_trajectory_point_map)
 
   add_executable(test_he3_quadrature tests/test_he3_quadrature.f90)
+  add_executable(test_bulk_gap tests/test_bulk_gap.f90)
+  target_link_libraries(test_bulk_gap PRIVATE he3_mesh)
+  add_test(NAME bulk_gap COMMAND test_bulk_gap)
+  foreach(invalid zero_temperature negative_cutoff excess_cutoff)
+    add_test(NAME ozaki_reject_${invalid} COMMAND test_he3_quadrature ${invalid})
+    set_tests_properties(ozaki_reject_${invalid} PROPERTIES WILL_FAIL TRUE)
+  endforeach()
   target_link_libraries(test_he3_quadrature PRIVATE he3_mesh)
   set_target_properties(test_he3_quadrature PROPERTIES
     Fortran_STANDARD 2018

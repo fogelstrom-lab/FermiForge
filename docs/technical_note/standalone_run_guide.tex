@@ -1,0 +1,262 @@
+\clearpage
+\section{Standalone calculation: complete setup and run guide}
+\label{sec:run-guide}
+
+This recipe starts a fresh quadrupole calculation at $T/T_c=0.30$,
+$F_1^s=0$, without depending on an earlier run directory. It uses the full 2D
+solver behind the historically named axisymmetric benchmark driver. All
+relative paths below are resolved from the \emph{repository root}.
+
+\subsection{Software and input inventory}
+
+Required software is a Fortran compiler (the tested path is GNU Fortran),
+CMake, a matching MPI library/launcher and Python with NumPy, Matplotlib and
+Pillow. No OpenBLAS link path is needed for this workflow. On another machine,
+build afresh rather than copying the laptop executable or its CMake cache.
+For a Python virtual environment, for example:
+\begin{lstlisting}
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt Pillow
+\end{lstlisting}
+
+The complete supplied namelist is
+\code{examples/2d_quadrupole_Fs1_0.nml}. Its four auxiliary input files are
+committed under
+\begin{lstlisting}
+benchmarks/a_phase_core_2d/reference/current_new_src_T0.30_F1s5.4/
+    op_xyz
+    curr
+    gauss11.dat
+    ozaki.dat
+\end{lstlisting}
+The driver currently requires the radial pair \code{op_xyz}/\code{curr}
+even for a fresh non-radial seed. These files supply the comparison profile,
+\emph{not} the quadrupole initial state or its fitted exterior. Their
+$F_1^s=5.4$ label does not override \code{feedback_scale=0}. Radial comparison
+errors and \code{benchmark passed} are not acceptance criteria for a
+quadrupole at different parameters. Removing this compatibility dependency
+from a generic production driver remains future work.
+
+{\small
+\begin{longtable}{p{31mm}p{109mm}}
+\toprule
+Input & Contents and authority\\
+\midrule
+\endhead
+Namelist & Chooses mesh, active mask, seed, feedback, endpoint policy,
+transport steps, iteration tolerance, checkpoints and file paths.\\
+\code{op_xyz} & One radial coordinate followed by 18 real values for the
+nine complex Cartesian order-parameter components, in row-major component
+order $xx,xy,xz,yx,yy,yz,zx,zy,zz$, real/imaginary pairs.\\
+\code{curr} & Five columns: radial coordinate, density diagnostic, and
+three real current-related mean-field values. The radial importer uses the
+fourth column (azimuthal field on the positive $x$ axis) and requires the
+radial and axial fields to be negligible. Both radial files must describe
+the same grid and cover the active comparison radius.\\
+\code{gauss11.dat} & Eleven rows of polar node and Gauss weight. This driver
+currently fixes 48 azimuthal samples and 11 polar nodes: 528 directions.
+There is no namelist angular-count override in this driver.\\
+\code{ozaki.dat} & Header: pole count, reduced temperature, cutoff;
+then pole/residue pairs. The supplied file has 8 poles and $T/T_c=0.30$.
+It sets the transport temperature and the seed temperature for this driver.
+Changing temperature requires a consistent new table, not only a label or
+the header of an old table.\\
+Restart file & Required only for \code{restart}/\code{restart_core}.
+For a fresh historical seed it is an empty string.\\
+\bottomrule
+\end{longtable}
+}
+
+\subsection{Complete fresh-run namelist}
+
+This listing is imported directly from the runnable example when the note is
+built, so the documented values do not drift from the supplied input.
+\lstinputlisting{../../examples/2d_quadrupole_Fs1_0.nml}
+
+\clearpage
+\subsection{Meaning of the controls}
+
+\begin{longtable}{>{\raggedright\arraybackslash\small}p{58mm}p{82mm}}
+\toprule
+Control or group & Interpretation and restrictions\\
+\midrule
+\endhead
+\code{half_width}, \code{number_of_cells}, \code{smooth_stretch} &
+$H=22$, $N=64$, $\lambda=2.3$ in \eqref{eq:smoothmesh}: 65 nodes per
+axis, 4225 stored points, minimum spacing about $0.321\xi_0$. Use even $N$
+to include the origin. These nodes are not moving during relaxation.\\
+\code{active_radius} & Radius of independently updated points: 20 here,
+3481 targets. Halo nodes outside are regenerated, not independently mixed.\\
+\code{feedback_scale} & $F_1^s/(1+F_1^s/3)$, not $F_1^s$ itself.
+Zero removes feedback in the trajectory self-energy; current-related
+diagnostic values can still be computed and nonzero.\\
+\code{asymptotic_bulk_gap}, \code{asymptotic_winding} &
+Bulk amplitude 0.2799 in the current normalization, unit phase winding.
+Changing temperature also requires a consistent bulk gap. Historical
+presets assume a centred, singly quantized vortex; leave the centre at zero
+and winding at one for this recipe.\\
+\code{endpoint_policy} & Use \code{state_asymptotic} for tails determined
+by the present relaxed state. \code{radial_reference} and
+\code{radial_asymptotic} instead use prescribed radial information;
+they are not substitutes for a freely evolving quadrupole exterior.\\
+\code{asymptotic_fit_inner_radius}, \code{asymptotic_matching_radius} &
+14 and 17 here. The order parameter uses the matching surface; the
+mean field uses both. Ensure all bilinear fit stencil nodes are active,
+not merely that the circles lie within the active radius.\\
+\code{asymptotic_outer_radius} & Riccati endpoint circle, 70 here; it must
+enclose the storage rectangle (for a centred square, $R_{\rm out}>\sqrt2H$).
+It is not the computational cell radius.\\
+\code{trajectory_maximum_step}, \code{asymptotic_maximum_step} &
+Maximum spacing in path coordinate $s$ in the stored mesh and analytic
+extension, respectively. Both 0.25 here. The runner's
+\code{--trajectory-step} overrides only the first.\\
+\code{minimum_substep_count}, \code{boundary_relaxation_distance} &
+Floor for pole-dependent RK substeps and length of a constant endpoint
+relaxation segment. Retained at 1 and 1.75.\\
+\code{initialization_mode} & Physical choice of seed, embedding or restart.
+Select one of the four historical presets in Section~\ref{sec:seeds}.\\
+\code{maximum_iterations}, \code{convergence_tolerance} &
+50 and $2\times10^{-6}$. Zero iterations requests a single map, not a
+relaxation. The stopping tolerance applies to the largest absolute packed
+real-component residual, not the area-weighted relative norm.\\
+\code{anderson_history_limit}, \code{anderson_progress_threshold},
+\code{anderson_maximum_mixing} & History capacity 10, source progress control
+0.1 and mixing cap 5. Reaching the cap or filling history does not disable
+the least-squares search.\\
+\code{checkpoint_interval} & Save every accepted update here (1).
+The field is saved but Anderson history is not.\\
+\code{require_convergence}, \code{maximum_embedding_error} &
+Benchmark acceptance controls, not modifications of the physical map.
+False permits iteration-limited exploratory runs; the embedding threshold
+checks the reference conversion, not physical agreement of a different core.\\
+\bottomrule
+\end{longtable}
+
+For \code{extended_smooth}, additionally set \code{preserved_core_half_width}
+and \code{outer_spacing_growth}; \code{half_width} becomes the new outer
+half-width while \code{number_of_cells} describes the preserved base grid.
+The optional \code{restart_core_radius} is used only by core transfer.
+For \code{multiscale}, the fine/medium extents and three spacings determine
+the grid instead. Fine/medium region controls also define diagnostic zones;
+if omitted, the circular driver uses radii 2 and 5 for those zones. They do
+not change a \code{smooth} grid's coordinates.
+
+\subsection{Build and launch}
+
+The Python runner configures a Release CMake build, builds the executable,
+creates a uniquely dated run directory, writes the effective namelist,
+launches MPI and plots saved output. From the repository root:
+\begin{lstlisting}
+python3 tools/run_axisymmetric_core_benchmark.py \
+  --input examples/2d_quadrupole_Fs1_0.nml \
+  --initialization-mode historical_qop \
+  --initialization historical-qop \
+  --case-name quadrupole-T030-Fs0 \
+  --build-dir work/quadrupole-seed-build \
+  --ranks 10 --formats png
+\end{lstlisting}
+\textbf{Important:} \code{--initialization} is a naming label only.
+\code{--initialization-mode} or the namelist actually selects the seed.
+The command specifies both to avoid ambiguity. To start a different core,
+change the physical mode to \code{historical_nop}, \code{historical_aop}
+or \code{historical_dop} and give the run a matching name. Do not assume
+the compact quadrupole domain is validated for a swollen double core.
+
+On the current Mac, the tested single-node launcher workaround prefixes that
+command with
+\begin{lstlisting}
+caffeinate -i env OMPI_MCA_pml=ob1 OMPI_MCA_btl=self,sm
+\end{lstlisting}
+Put the prefix and Python command on the same shell command line.
+This Open MPI 5 shared-memory setting is for this laptop, \emph{not} a
+multi-node cluster configuration. On clusters use the site's compiler/MPI
+modules and scheduler launcher, and omit \code{caffeinate} and this transport
+override. Do not run two ten-rank jobs at the same time on the laptop.
+
+For a manually managed build or scheduler job, the equivalent build target is
+\begin{lstlisting}
+cmake -S . -B work/standalone-build \
+  -DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_BUILD_TYPE=Release
+cmake --build work/standalone-build \
+  --target benchmark_axisymmetric_core_2d --parallel 10
+\end{lstlisting}
+The raw executable takes seven positional arguments: namelist, initial
+field, mapped field, metrics, final field, history and checkpoint. Create
+the output directory first. For example, use a unique directory rather than
+overwriting a previous run:
+\Needspace{10\baselineskip}
+\begin{lstlisting}
+run_dir="$(mktemp -d "$PWD/runs/manual-quadrupole-XXXXXX")"
+cp examples/2d_quadrupole_Fs1_0.nml "$run_dir/input.nml"
+mpiexec -n 10 work/standalone-build/benchmark_axisymmetric_core_2d \
+  "$run_dir/input.nml" "$run_dir/input_fields_2d.dat" \
+  "$run_dir/mapped_fields_2d.dat" "$run_dir/metrics.txt" \
+  "$run_dir/final_fields_2d.dat" "$run_dir/iteration_history.dat" \
+  "$run_dir/checkpoint_fields_2d.dat" > "$run_dir/run.log" 2>&1
+\end{lstlisting}
+This raw route does not automatically generate plots or the Python runner's
+manifest. It still uses repository-root-relative input paths. For portable
+archiving, copy all four auxiliary files into the archived case and update
+their namelist paths explicitly; the runner archives the effective namelist
+but does not make every referenced external file self-contained.
+
+\subsection{Inspect, continue and interpret a run}
+
+After the first checkpoint is written, a second terminal can produce an
+independent inspection snapshot without evaluating any trajectories:
+\begin{lstlisting}
+python3 tools/plot_running_axisymmetric.py \
+  --latest quadrupole --no-radial-comparison
+\end{lstlisting}
+For an older run, replace \code{--latest quadrupole} by its explicit directory.
+Each invocation creates a dated inspection subdirectory: Cartesian and
+harmonic amplitude/phase maps, pair-density and current-related proxies,
+axis profiles, convergence and spatial RMS/max residual dynamics. It neither
+stops the solver nor overwrites its files. If a checkpoint is being written,
+retry after the write completes. The no-comparison flag avoids treating the
+unrelated A-phase reference as the quadrupole target.
+
+To continue from a checkpoint, substitute the actual directory name for the
+dated placeholder below:
+\begin{lstlisting}
+old=runs/YYMMDD-HHMMSS-quadrupole-T030-Fs0-historical-qop
+python3 tools/run_axisymmetric_core_benchmark.py \
+  --input "$old/input.nml" \
+  --restart "$old/checkpoint_fields_2d.dat" \
+  --case-name quadrupole-continued --initialization restart \
+  --build-dir work/quadrupole-seed-build \
+  --ranks 10 --max-iterations 50 --checkpoint-interval 1 --formats png
+\end{lstlisting}
+Use \code{final_fields_2d.dat} after a completed run. Do not pass
+\code{--initialization-mode historical_qop} when restarting: it would
+override the requested restart. The mesh must match; a restart begins fresh
+Anderson history and its iteration numbering restarts at one.
+
+The live log prints one line per completed update, not continuous progress
+within a map. A saved checkpoint after update $k$ contains the accepted field;
+residual snapshot $k$ describes the field \emph{before} that update.
+\code{iteration_limit} is not convergence, and the final accepted field need
+not have its own newly evaluated residual. The plotting snapshot's internal
+filename \code{final_fields_2d.dat} is only a compatibility copy of the
+checkpoint, not a declaration of convergence.
+
+Per-rank files ending in \code{shutdown.rankNNNNNN.txt} audit MPI finalization.
+The observed launcher improper-exit warning is not proved to be a numerical
+failure or harmless: retain the audit and exit status. Saved-output plotting
+can proceed independently, but should never turn a failed launcher status
+into a successful run. The current runner attempts plotting after launcher
+failure when complete outputs exist and preserves that failure in its report.
+
+\subsection{Current limits of this standalone route}
+
+This is a runnable free-vortex calculation, not yet a general material/device
+input language. There is no boundary-wall or lead specification in this
+namelist, no connected dipole self-energy, no arbitrary exchange-field input,
+and no GPU backend. The driver exposes circular masks and theoretical bulk
+orientation; optional zero-mode projection, elliptical mask studies and
+shadow-probe workflows are in the separate double-core driver, not controls
+that can be copied into this namelist. \code{prepare_only=.true.} is an
+internal executable preflight that writes the initial/reference fields and
+exits without maps; it does not produce the complete files expected by the
+normal Python run wrapper. Keep it false or omitted for a calculation.

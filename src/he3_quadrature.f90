@@ -1,6 +1,7 @@
 module he3_quadrature
   use, intrinsic :: ieee_arithmetic, only : ieee_is_finite
   use he3_kinds, only : rk
+  use ozaki_generator, only : ozaki_set_cutoff, ozaki_poles
   implicit none
   private
 
@@ -32,8 +33,41 @@ module he3_quadrature
   public :: read_legacy_gauss_table
   public :: make_ozaki_quadrature
   public :: read_legacy_ozaki_table
+  public :: generate_ozaki_quadrature, write_ozaki_table
 
 contains
+
+  subroutine generate_ozaki_quadrature(temperature, cutoff, quadrature)
+    real(rk), intent(in) :: temperature, cutoff
+    type(ozaki_quadrature_t), intent(out) :: quadrature
+    real(rk), allocatable :: poles(:), residues(:)
+    integer :: count
+    logical :: success
+    if (.not. ieee_is_finite(temperature) .or. temperature <= 0.0_rk) &
+      error stop "Ozaki temperature must be finite and positive"
+    if (.not. ieee_is_finite(cutoff) .or. cutoff <= 0.0_rk .or. cutoff > real(huge(1),rk)) &
+      error stop "Ozaki cutoff must be finite, positive and representable"
+    ! Exactly the selection and energy conversion used by supplied setpoles.f90.
+    call ozaki_set_cutoff(cutoff/temperature, count, success)
+    if (.not. success) error stop "Ozaki cutoff requires more than 200 poles"
+    allocate(poles(count),residues(count))
+    call ozaki_poles(count,poles,residues)
+    poles = temperature*poles/(2.0_rk*pi)
+    call make_ozaki_quadrature(temperature,int(cutoff),poles,residues,quadrature)
+  end subroutine
+
+  subroutine write_ozaki_table(path, cutoff, quadrature)
+    character(len=*), intent(in) :: path
+    real(rk), intent(in) :: cutoff
+    type(ozaki_quadrature_t), intent(in) :: quadrature
+    integer :: unit, i
+    open(newunit=unit,file=path,status='replace',action='write')
+    write(unit,*) quadrature%pole_count(),quadrature%temperature,cutoff
+    do i=1,quadrature%pole_count()
+      write(unit,'(2es26.17e3)') quadrature%pole(i),quadrature%residue(i)
+    end do
+    close(unit)
+  end subroutine
 
   subroutine make_legacy_angular_quadrature( &
       azimuth_count, polar_node, raw_polar_weight, quadrature)

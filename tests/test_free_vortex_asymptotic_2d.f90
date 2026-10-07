@@ -170,6 +170,17 @@ contains
                  maxval(abs(completed%current_mean_field(:, point) - &
                             expected_current)) < 3.0e-14_rk, &
       "dependent asymptotic halo was not regenerated from the fit")
+    ! A subsequent relaxation must change the tail, not reuse initial data.
+    state%order_parameter(1,3,:) = state%order_parameter(1,3,:) + 0.1_rk
+    state%current_mean_field = 2.0_rk * state%current_mean_field
+    call apply_free_vortex_asymptotic_halo_2d( &
+      mesh, state, active, endpoint, completed)
+    expected_gap(1,3) = expected_gap(1,3) + &
+      0.1_rk * endpoint%matching_radius / sqrt(dot_product(position,position))
+    call require(abs(completed%order_parameter(1,3,point)-expected_gap(1,3)) < 3.e-14_rk, &
+      'order-parameter tail did not follow the changed state')
+    call require(maxval(abs(completed%current_mean_field(:,point)-2.0_rk*expected_current)) < 3.e-14_rk, &
+      'mean-field tail did not follow the changed state')
   end subroutine test_angle_dependent_two_term_fit
 
 

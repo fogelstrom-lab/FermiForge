@@ -6,7 +6,7 @@ module axial_radial_embedding
   use order_parameter_basis, only : projection_plus, projection_zero, &
                                     projection_minus, &
                                     cartesian_to_axial_harmonics, &
-                                    axial_harmonics_to_transport_cartesian
+                                    axial_harmonics_to_cartesian, axial_harmonics_to_transport_cartesian
   implicit none
   private
 
@@ -14,6 +14,8 @@ module axial_radial_embedding
   complex(rk), parameter :: complex_zero = cmplx(0.0_rk, 0.0_rk, kind=rk)
 
   type, public :: axial_radial_profile_t
+    ! Opt-in only for reproduction of the historical transport algorithm.
+    logical :: legacy_transport_projection = .false.
     complex(rk), allocatable :: harmonic(:, :, :)
     real(rk), allocatable :: azimuthal_mean_field(:)
   contains
@@ -102,7 +104,12 @@ contains
 
     call interpolate_phased_harmonics(mesh, profile, radius, angle, winding, &
                                       phased_harmonic)
-    call axial_harmonics_to_transport_cartesian(phased_harmonic, order_parameter)
+    ! Physical tensor embedding: do not impose the legacy Axy=-Ayx projection.
+    if (profile%legacy_transport_projection) then
+      call axial_harmonics_to_transport_cartesian(phased_harmonic, order_parameter)
+    else
+      call axial_harmonics_to_cartesian(phased_harmonic, order_parameter)
+    end if
     call interpolate_azimuthal_mean_field(mesh, profile, radius, azimuthal_value)
 
     if (radius > tolerance) then

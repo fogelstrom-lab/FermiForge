@@ -52,14 +52,28 @@ def main() -> int:
     stochastic = column.get("stochastic_fallback", np.zeros_like(iteration)) > 0.5
 
     figure, axis = plt.subplots(figsize=(8.4, 5.2), constrained_layout=True)
-    axis.axvspan(
-        iteration[0] - 0.5,
-        iteration[-1] + 0.5,
-        color="#efedf5",
-        alpha=0.65,
-        label="legacy Anderson engine",
-        zorder=0,
-    )
+    engine = column.get("engine", np.ones_like(iteration))
+    seen = set()
+    for index, method in enumerate(engine):
+        label = {1: "Anderson", 0: "simple mixing", 2: "BB", 3: "Polyak", -1: "single map"}[int(method)]
+        axis.axvspan(iteration[index] - 0.5, iteration[index] + 0.5,
+                     color="#efedf5" if method == 1 else "#fff0cc",
+                     alpha=0.65, label=label if method not in seen else None,
+                     hatch="//" if method == 0 else (".." if method == 2 else None), zorder=0)
+        seen.add(method)
+    position = column.get("cycle_position", np.zeros_like(iteration))
+    restart = column.get("history_restart", np.zeros_like(iteration)) > 0.5
+    for index, value in enumerate(iteration[restart]):
+        axis.axvline(value - 0.5, color="black", linestyle="--",
+                     label="restart: fresh iterator history" if index == 0 else None)
+    fallback = column.get("bb_status", np.zeros_like(iteration)) > 0
+    if np.any(fallback):
+        axis.scatter(iteration[fallback], maximum[fallback], marker="x",
+                     color="black", label="BB safeguarded step", zorder=5)
+    resets = (engine == 1) & (position == 1) & (iteration > iteration[0])
+    for index, value in enumerate(iteration[resets]):
+        axis.axvline(value - 0.5, color="0.35", linestyle=":",
+                     label="fresh AA history" if index == 0 else None)
     axis.semilogy(
         iteration,
         rms,
@@ -92,7 +106,7 @@ def main() -> int:
     mixing_axis.plot(
         iteration, mixing, "^-", color="#1b7837", linewidth=1.2, label="mixing p"
     )
-    mixing_axis.set_ylabel("Anderson mixing p", color="#1b7837")
+    mixing_axis.set_ylabel("mixing p", color="#1b7837")
     mixing_axis.tick_params(axis="y", colors="#1b7837")
 
     handles, labels = axis.get_legend_handles_labels()

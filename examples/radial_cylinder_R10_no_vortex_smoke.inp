@@ -1,0 +1,11 @@
+0.30                  : T/Tc
+0.0                   : vorticity (no vortex)
+1                     : specular cylinder
+0.0                   : F1s
+2                     : azimuthal directions, smoke only
+1.e-6                 : residual tolerance
+-1                    : uniform bulk B seed, no restart
+3                     : Anderson mixing
+1                     : main updates, after up to five NN startup updates
+1.0                   : AA p_max
+10.0                  : wall radius in zero-temperature coherence lengths xi_0

@@ -1,11 +1,11 @@
 program test_cartesian_field_2d
   use he3_kinds, only : rk
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t, &
-    make_uniform_cartesian_mesh, &
-    make_symmetric_multiscale_cartesian_mesh, make_circular_active_mask
+    make_uniform_cartesian_mesh, make_rectilinear_cartesian_mesh, make_smooth_cartesian_mesh, &
+    make_symmetric_multiscale_cartesian_mesh, make_circular_active_mask, make_extended_smooth_cartesian_mesh
   use spinful_state_2d, only : spinful_state_2d_t, allocate_spinful_state_2d
   use bilinear_field_sampler_2d, only : bilinear_stencil_2d_t, &
-                                        make_bilinear_stencil_2d, &
+                                        make_bilinear_stencil_2d, make_quadratic_stencil_2d, &
                                         sample_spinful_state_2d, &
                                         sample_spinful_stencil_2d, &
                                         sample_pair_potential_2d
@@ -16,6 +16,9 @@ program test_cartesian_field_2d
   implicit none
 
   call test_mesh_geometry_and_numbering()
+  call test_smooth_mesh()
+  call test_extended_mesh()
+  call test_quadratic_nonuniform()
   call test_multiscale_mesh_and_active_circle()
   call test_boundary_safe_stencils()
   call test_constant_and_affine_fields()
@@ -29,6 +32,80 @@ program test_cartesian_field_2d
   print '(a)', "Cartesian 2D field-sampling tests passed"
 
 contains
+
+  subroutine test_extended_mesh()
+    type(cartesian_mesh_2d_t) :: core,extended
+    integer :: i,offset
+    call make_smooth_cartesian_mesh(20.0_rk,64,2.3_rk,core)
+    call make_extended_smooth_cartesian_mesh(20.0_rk,64,2.3_rk,60.0_rk,1.15_rk,extended)
+    call require(extended%is_valid(),'extended grid invalid')
+    offset=(extended%x_point_count()-core%x_point_count())/2
+    do i=0,64
+      call require(abs(core%x_coordinate(i)-extended%x_coordinate(i+offset))<1.e-14_rk, &
+        'extension changed an existing core coordinate')
+    end do
+    do i=0,extended%x_cell_count()
+      call require(abs(extended%x_coordinate(i)+extended%x_coordinate(extended%x_cell_count()-i))<1.e-14_rk, &
+        'extended grid is not symmetric')
+    end do
+    call require(abs(extended%x_maximum-60.0_rk)<1.e-14_rk,'wrong outer extent')
+  end subroutine test_extended_mesh
+
+  subroutine test_smooth_mesh()
+    type(cartesian_mesh_2d_t) :: mesh
+    integer :: i
+    real(rk) :: previous, spacing
+    call make_smooth_cartesian_mesh(20.0_rk,64,2.3_rk,mesh)
+    call require(mesh%is_valid(),'smooth mesh validity')
+    call require(mesh%x_point_count()==65,'smooth mesh point count')
+    call require(mesh%x_coordinate(32)==0.0_rk,'smooth mesh origin')
+    call require(abs(mesh%x_coordinate(64)-20.0_rk)<1e-14_rk,'smooth endpoint')
+    previous=0.0_rk
+    do i=32,63
+      spacing=mesh%x_cell_spacing(i)
+      call require(spacing>previous,'smooth spacing should increase outward')
+      if(previous>0.0_rk) call require(spacing/previous<1.08_rk,'smooth grading jump')
+      previous=spacing
+      call require(abs(mesh%x_coordinate(i)+mesh%x_coordinate(64-i))<1e-13_rk,'smooth symmetry')
+    end do
+    call make_smooth_cartesian_mesh(20.0_rk,64,0.0_rk,mesh)
+    call require(abs(mesh%minimum_spacing()-0.625_rk)<1e-14_rk,'smooth uniform limit')
+  end subroutine test_smooth_mesh
+
+  subroutine test_quadratic_nonuniform()
+    type(cartesian_mesh_2d_t) :: mesh
+    type(spinful_state_2d_t) :: state
+    type(bilinear_stencil_2d_t) :: stencil
+    real(rk) :: xy(2), x, y, v, mean(3)
+    complex(rk) :: order(3,3)
+    integer :: point, i, j
+    logical :: inside
+    call make_rectilinear_cartesian_mesh( &
+      [-3.0_rk,-1.0_rk,-0.2_rk,0.0_rk,0.2_rk,1.0_rk,3.0_rk], &
+      [-2.0_rk,-0.1_rk,0.1_rk,2.0_rk],mesh)
+    call allocate_spinful_state_2d(mesh,state)
+    do point=1,mesh%point_count()
+      xy=mesh%point_coordinate(point)
+      v=(1.0_rk+xy(1)+xy(1)**2)*(2.0_rk-xy(2)+xy(2)**2)
+      state%order_parameter(:,:,point)=cmplx(v,-2*v,rk)
+      state%current_mean_field(:,point)=v
+    end do
+    do j=0,20
+      y=-2.0_rk+4.0_rk*j/20.0_rk
+      do i=0,30
+        x=-3.0_rk+6.0_rk*i/30.0_rk
+        call make_quadratic_stencil_2d(mesh,x,y,stencil)
+        call sample_spinful_stencil_2d(state,stencil,order,mean,inside)
+        v=(1+x+x*x)*(2-y+y*y)
+        call require(inside,'quadratic rejected included boundary')
+        call require(abs(sum(stencil%weight)-1)<1e-12_rk,'quadratic partition of unity')
+        call require(maxval(abs(order-cmplx(v,-2*v,rk)))<1e-10_rk,'quadratic complex exactness')
+        call require(maxval(abs(mean-v))<1e-10_rk,'quadratic mean field exactness')
+      end do
+    end do
+    call make_quadratic_stencil_2d(mesh,3.1_rk,0.0_rk,stencil)
+    call require(.not.stencil%inside,'quadratic must not extrapolate')
+  end subroutine test_quadratic_nonuniform
 
   subroutine test_mesh_geometry_and_numbering()
     type(cartesian_mesh_2d_t) :: mesh

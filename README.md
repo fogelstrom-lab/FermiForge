@@ -15,11 +15,38 @@ The staged scientific and software roadmap is maintained in
 spinful calculation of the free double-core vortex in 3He-B; general device
 boundaries and GPU execution follow explicit validation gates.
 
+The current equations, grid and core-seed figures, and complete standalone
+run instructions are collected in the
+[FermiForge implementation note](output/pdf/fermiforge_algorithm_and_architecture.pdf).
+Its editable LaTeX and rebuild instructions are in
+[docs/technical_note](docs/technical_note/README.md).
+
+For alternating Anderson and simple updates, including a restart launcher for
+the latest localized 0+ run, see [Cycled iteration](docs/CYCLED_ITERATION.md).
+An independent safeguarded [BB engine](docs/BB_ITERATION.md) is also available.
+The [Polyak momentum engine](docs/POLYAK_ITERATION.md) provides a matched radial
+comparison using the method in SuperConga Appendix E.
+For fast axisymmetric accelerator tests with only a radial ray of independent
+points, see [Radial symmetry mode](docs/RADIAL_SYMMETRY.md).
+NAISS preparation: [resource estimate](docs/hpc/NAISS_ALLOCATION_ESTIMATE.md),
+[technical appendix](docs/hpc/NAISS_TECHNICAL_APPENDIX.md), and
+[portable MPI scaling benchmark](docs/hpc/SCALING.md).
+
 ## Current status
 
-The modern support library now contains both the dynamically sized radial
-reference infrastructure and the first isolated two-dimensional field-sampling
-slice. It provides:
+Start with the [hands-on framework map](docs/FRAMEWORK_GUIDE.md), updated
+6 October 2026: driver selection, algorithm flow, source navigation, input
+controls, short exercises, diagnostics and present limitations.
+
+The modern Fortran framework supports iterated full-2D free vortices, a cheaper
+radial-symmetry mode using the same point-map physics, and a radial specular
+cylinder driver. Python manages runs and plots; it is not the transport solver.
+Free-vortex accelerator choices include Anderson, BB and Polyak. The cylinder
+currently uses Anderson. General 2D walls, device leads, DG and GPU execution
+remain development targets.
+
+The following is an inventory of foundations and historical validation steps,
+not a list of restrictions to the earliest single-map implementation:
 
 - an exact uniform representation of the legacy 49-cell/50-point radial grid;
 - core- and surface-localized adaptive refinement;
@@ -78,16 +105,13 @@ slice. It provides:
   oracles; and
 - an organized full-grid MPI benchmark runner with accessible plots.
 
-The complete map is now distributed over a full Cartesian grid with MPI and is
-connected to the legacy-compatible Anderson update. The trusted `new_src`
-radial calculation remains the numerical reference while each layer is
-validated independently. The normal- and A-phase-core benchmarks each perform
-one full 2D self-consistency map; neither is yet a converged multi-iteration 2D
-vortex. Their comparisons demonstrate that a single uniform grid cannot
-efficiently resolve both the coherence-length core and the large outer domain.
-The first static multiscale/circular-active backend is now working; automatic
-block refinement, field transfer, and a converged multi-iteration solution are
-the next production gates.
+The trusted `new_src` radial calculation remains a numerical reference while
+layers are validated independently. Subsequent work extended the original
+single-map benchmarks to multi-iteration calculations, smooth graded grids,
+quadratic sampling, evolving asymptotics, restarts and spatial residual
+diagnostics. The grid remains structured Cartesian in full-2D mode; universal
+automatic error-controlled refinement is not yet implemented. See the framework
+guide for the distinction between tested cases and planned capabilities.
 
 ## Run the isolated 2D demonstration
 
@@ -180,7 +204,10 @@ with `import_legacy_split_field_map_2d`. The reader infers the rectilinear
 mesh, preserves all complex order-parameter and Fermi-liquid mean-field
 components, and checks the redundant norm columns. See
 `docs/IMPORTING_LEGACY_2D_FIELDS.md` for the command and the explicitly
-different legacy harmonic convention.
+different legacy harmonic convention. The same note documents
+`tools/plot_legacy_double_core_reference.py`, which creates full-cell and
+core-window versions of the modern reference plot set directly from the
+ignored archive.
 
 The first nonaxisymmetric transport check uses the complete imported field for
 trajectory interpolation but maps only a configurable set of core and outer
@@ -206,6 +233,14 @@ solution. Detailed controls, expected values, and restart instructions are in
 `docs/RUNNING_DOUBLE_CORE_2D_BENCHMARK.md`.
 
 ## Start a double-core candidate from scratch
+
+To start instead from the archived converged double-core solution, use
+`python3 tools/run_converged_reference.py --iterations 20`. Omitting
+`--iterations` measures the initial map defect without an update;
+`--probe-only` provides a quick double-core check. The same wrapper accepts
+`--core normal` and `--core a-phase` for the preserved converged `new_src`
+radial references. See `docs/RUNNING_CONVERGED_REFERENCES.md` for frozen and
+evolving exterior comparisons, mesh controls, and interpretation.
 
 The modern solver can also generate a regularized London/two-half-core seed on
 a newly constructed multiscale mesh, with zero initial Fermi-liquid mean field:

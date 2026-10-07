@@ -45,7 +45,7 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--iterations",
         type=int,
         help=(
-            "maximum Anderson updates (default: maximum_iterations from "
+            "maximum Anderson updates; zero evaluates the initial map (default: maximum_iterations from "
             "the selected input)"
         ),
     )
@@ -178,6 +178,7 @@ def plotting_python() -> Path | None:
         sys.executable,
         shutil.which("python3"),
         "/opt/homebrew/bin/python3",
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
         "/usr/local/bin/python3",
         "/opt/local/bin/python3",
     )
@@ -285,6 +286,18 @@ def make_plots(
             str(plot_directory / "double_core_structure_history.png"),
         ],
     ]
+    if completed_iterations == 0:
+        commands = [
+            command for command in commands
+            if Path(command[1]).name not in (
+                "plot_2d_iteration_history.py",
+                "plot_double_core_structure_history.py",
+            )
+        ]
+    commands.append([
+        str(python), str(PROJECT_ROOT / "tools/plot_residual_locations.py"),
+        str(run_directory), "--output", str(plot_directory),
+    ])
     probe_file = run_directory / "asymptotic_probe_states.dat"
     if probe_file.is_file():
         probe_command = [
@@ -350,8 +363,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if arguments.iterations is not None
             else namelist_integer(template, "maximum_iterations")
         )
-        if requested_iterations < 1:
-            raise LadderError("iterations must be positive")
+        if requested_iterations < 0:
+            raise LadderError("iterations cannot be negative")
+        if requested_iterations == 0:
+            arguments.checkpoint_every = 0
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", arguments.run_name):
             raise LadderError("run-name contains unsafe filename characters")
         timestamp = dt.datetime.now().strftime("%y%m%d-%H%M%S")
@@ -431,12 +446,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 run_directory / "run.log",
             )
         except LadderError as error:
-            # Open MPI/PRRTE can occasionally report a nonzero launcher exit
-            # after a long macOS sleep/resume cycle even though every numerical
-            # product and the restart checkpoint have already been flushed.
-            # A newly-created run directory cannot contain stale products, so
-            # allow the normal validation below to decide whether this is a
-            # recoverable launcher-only failure.  Partial runs remain fatal.
+            # Preserve and plot completed numerical products, but do not
+            # equate their existence with successful MPI shutdown.
             required_products = list(paths.values())
             if arguments.checkpoint_every:
                 required_products.append(checkpoint_path)
@@ -445,13 +456,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             launcher_warning = str(error)
             print(
                 "warning: MPI launcher returned nonzero after all expected "
-                "products were written; validating and recovering the run",
+                "products were written; preserving results, shutdown is NOT clean",
                 file=sys.stderr,
             )
         metrics = read_metrics(paths["metrics_file"])
         result: dict[str, object] = {
             "terminal_status": metrics.get("terminal_status", "missing"),
             "initialization_mode": metrics.get("initialization_mode", "missing"),
+            "trajectory_interpolation_order": optional_metric_int(
+                metrics, "trajectory_interpolation_order", 1
+            ),
             "mesh_x_points": metric_int(metrics, "mesh_x_points"),
             "mesh_y_points": metric_int(metrics, "mesh_y_points"),
             "updated_points": metric_int(metrics, "updated_points"),
@@ -526,6 +540,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             asymptotic_validation_status == "passed"
         )
         iteration_count_is_valid = (
+            result["terminal_status"] == "single_map"
+            and requested_iterations == 0
+            and int(result["iterations_completed"]) == 0
+        ) or (
             result["terminal_status"] == "converged"
             and 1 <= int(result["iterations_completed"]) <= requested_iterations
         ) or (
@@ -534,12 +552,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         calculation_passed = (
             result["initialization_mode"] in (
+                "legacy_split",
+                "legacy_resampled",
+                "restart",
                 "regularized_london",
                 "historical_nop",
                 "historical_aop",
                 "historical_dop",
+                "historical_qop",
             )
-            and result["terminal_status"] in ("iteration_limit", "converged")
+            and result["terminal_status"] in ("single_map", "iteration_limit", "converged")
             and iteration_count_is_valid
             and int(result["sparse_restart_applied_points"])
             == expected_restart_points
@@ -574,11 +596,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 (
                     "inherited checkpoint state"
                     if expected_restart_points > 0
-                    else "regularized London seed"
+                    else (
+                        "imported legacy reference"
+                        if str(result["initialization_mode"]).startswith("legacy_")
+                        else "regularized London seed"
+                    )
                 ),
             )
         report = {
-            "kind": "fermiforge_double_core_from_scratch",
+            "kind": (
+                "fermiforge_double_core_legacy_reference"
+                if str(result["initialization_mode"]).startswith("legacy_")
+                else "fermiforge_double_core_from_scratch"
+            ),
             "created_at": dt.datetime.now().astimezone().isoformat(),
             "input_template": str(input_path),
             "ranks": arguments.ranks,
@@ -594,16 +624,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             "expected_restart_points": expected_restart_points,
             "launcher_warning": launcher_warning,
+            "mpi_launcher_clean": launcher_warning is None,
+            "calculation_passed": calculation_passed,
             "result": result,
             "asymptotic_validation_passed": result[
                 "asymptotic_validation_passed"
             ],
             "plots": [str(path) for path in plot_paths],
-            "passed": calculation_passed and (
+            "passed": calculation_passed and launcher_warning is None and (
                 arguments.no_plot
                 or len(plot_paths)
                 == (
-                    16
+                    (18 if int(result["iterations_completed"]) > 0 else 16)
                     + (3 if paths.get("asymptotic_probe_file") else 0)
                     + (4 if paths.get("asymptotic_shadow_file") else 0)
                 )

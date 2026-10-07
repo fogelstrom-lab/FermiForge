@@ -21,7 +21,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from plot_2d_fields import COMPONENTS, FieldMap, PlotError, load_field_map
+from plot_2d_fields import (COMPONENTS, HARMONIC_COMPONENTS, FieldMap, PlotError,
+                           load_field_map, cartesian_to_harmonics)
 
 
 ROW_COLOURS = ("#000000", "#D55E00", "#0072B2")
@@ -42,12 +43,15 @@ def parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     )
     parser.add_argument("field_map", type=Path, help="field map to plot")
+    parser.add_argument('--basis', choices=('cartesian', 'harmonic'), default='cartesian',
+                        help='local components, without removing vortex/angular phase')
     parser.add_argument(
         "--reference-field",
         type=Path,
         help="optional field map shown as a first comparison row",
     )
     parser.add_argument("--label", default="relaxed state")
+    parser.add_argument("--title", default="Double-core symmetry-axis order-parameter profiles")
     parser.add_argument("--reference-label", default="initial seed")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument(
@@ -78,18 +82,20 @@ def zero_index(coordinate: np.ndarray, name: str) -> int:
     return index
 
 
-def positive_axis_profiles(field: FieldMap) -> tuple[AxisProfile, AxisProfile]:
+def positive_axis_profiles(field: FieldMap, basis: str = 'cartesian') -> tuple[AxisProfile, AxisProfile]:
+    values = (cartesian_to_harmonics(field.order_parameter)
+              if basis == 'harmonic' else field.order_parameter)
     x_zero = zero_index(field.x, "x")
     y_zero = zero_index(field.y, "y")
     x_mask = field.x >= -512.0 * np.finfo(float).eps
     y_mask = field.y >= -512.0 * np.finfo(float).eps
     x_profile = AxisProfile(
         coordinate=field.x[x_mask],
-        values=field.order_parameter[:, :, y_zero, :][:, :, x_mask],
+        values=values[:, :, y_zero, :][:, :, x_mask],
     )
     y_profile = AxisProfile(
         coordinate=field.y[y_mask],
-        values=field.order_parameter[:, :, :, x_zero][:, :, y_mask],
+        values=values[:, :, :, x_zero][:, :, y_mask],
     )
     return x_profile, y_profile
 
@@ -118,11 +124,14 @@ def plot_profile_panel(
     normalization: float,
     threshold: float,
     reverse_axis: bool,
+    basis: str = 'cartesian',
 ) -> float:
     largest = 0.0
     line_count = 0
     marker_stride = max(1, profile.coordinate.size // 10)
-    for name, spin, orbital in COMPONENTS:
+    components = HARMONIC_COMPONENTS if basis == 'harmonic' else COMPONENTS
+    symbol = 'C' if basis == 'harmonic' else 'A'
+    for name, spin, orbital in components:
         normalized = profile.values[spin, orbital] / normalization
         for part_name, part, marker in (
             ("Re", normalized.real, None),
@@ -143,7 +152,7 @@ def plot_profile_panel(
                 markevery=marker_stride if marker else None,
                 markerfacecolor="white" if marker else None,
                 markeredgewidth=0.7 if marker else None,
-                label=rf"{part_name} $A_{{{name}}}$",
+                label=rf"{part_name} ${symbol}_{{{name}}}$",
             )
             line_count += 1
     if line_count == 0:
@@ -195,7 +204,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     largest = 1.0
     for row, (label, field) in enumerate(fields):
-        x_profile, y_profile = positive_axis_profiles(field)
+        x_profile, y_profile = positive_axis_profiles(field, arguments.basis)
         largest = max(
             largest,
             plot_profile_panel(
@@ -204,6 +213,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 normalization,
                 arguments.visibility_threshold,
                 reverse_axis=True,
+                basis=arguments.basis,
             ),
             plot_profile_panel(
                 axes[row, 1],
@@ -211,9 +221,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 normalization,
                 arguments.visibility_threshold,
                 reverse_axis=False,
+                basis=arguments.basis,
             ),
         )
-        axes[row, 0].set_ylabel(r"$A_{mn}/\Delta_{\rm bulk}$")
+        axes[row, 0].set_ylabel(r"$C_{s k}/\Delta_{\rm bulk}$" if arguments.basis == 'harmonic'
+                                else r"$A_{mn}/\Delta_{\rm bulk}$")
         axes[row, 0].set_title(f"{label}: positive x axis")
         axes[row, 1].set_title(f"{label}: positive y axis")
         axes[row, 0].set_xlabel(r"$x/\xi_0$")
@@ -224,8 +236,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         for axis in axis_row:
             axis.set_ylim(-limit, limit)
     figure.suptitle(
-        "Double-core symmetry-axis order-parameter profiles\n"
-        rf"FermiForge counterpart of dcvlong Fig. 4; $\Delta_{{\rm bulk}}={normalization:.6g}$",
+        arguments.title + "\n" +
+        (r"Local harmonics: spin, orbital = $(+,0,-)$; angular phase retained; "
+         if arguments.basis == 'harmonic' else 'FermiForge counterpart of dcvlong Fig. 4; ') +
+        rf"$\Delta_{{\rm bulk}}={normalization:.6g}$",
         fontsize=12,
     )
     arguments.output.parent.mkdir(parents=True, exist_ok=True)

@@ -1,5 +1,409 @@
 # FermiForge Modernization Log
 
+## 2026-10-02 — Explicit Anderson mixing-parameter rule documented
+
+- Checked update_anderson/reset/stochastic_step and added the exact p update
+  formula to the accelerator note. Distinguished current measured residual
+  in the prediction factor from smallest retained reference residual in the
+  displacement ratio, and defined the stored predicted squared norm.
+- Documented clipping, initial/reset step, converged-call reporting and
+  fallback exceptions; clarified that this is not a line search over p.
+  Documentation only; no solver or archived-run changes.
+
+## 2026-10-02 — Completed pmax3 comparison added to the note
+
+- Run 261002-130520 converged cleanly in 154 maps: RMS 3.9395362e-7,
+  max 1.7961276e-6. Verified identical scratch initial arrays, signed norms,
+  state continuity and common radial layout. No solver run launched.
+- Added AA3 to convergence figures, threshold table and signed-pattern analysis.
+  Ten RMS increases, one doubling, no full-vector reversals; inner FL still
+  reverses in 54/77 late-window pairs. Leading outer rotation cosine 0.9904;
+  fixed inner BB-probe share 0.15%. Split signed history figures across two
+  pages with identical vertical scales for legibility.
+- Retained neutral methods-first layout and AA5 restart caveat. AA3 has the
+  lowest observed map count (154 vs 161/224), not a proven optimal cap.
+  Recompiled and visually checked all ten PDF pages; no LaTeX overflow warnings.
+
+## 2026-10-02 — Neutral methods-first note and spatial residual comparison
+
+- Reorganised accelerator note: common problem, methods, per-method results,
+  spatial diagnostics, then comparison/conclusions. Separated physical
+  hard/soft-core texture from numerical residuals and iteration oscillations.
+- Added compare_signed_residual_patterns.py and two figures: fixed BB spatial
+  probes and their unnormalized signed histories for BB/AA5/AA10. Analysis
+  windows start at first max error <=2e-5; fixed probe origin/window explicit.
+- Independent per-run unit-residual SVD confirms leading outer spin-y tangent
+  overlaps 0.9957/0.9969/0.9934. Inner FL reversals persist under Anderson;
+  their weight in the total residual, not necessarily their frequency, falls.
+  Added caveats on empirical patterns versus eigenmodes and spatial alternation.
+- Verified signed norms, continuity, identical layouts and SVD orthonormality;
+  compiled/rendered the revised PDF. No solver or archived-run changes.
+
+## 2026-10-02 — pmax3 Anderson scratch comparison prepared
+
+- Added tools/run_radial_anderson_p3.sh, matching the pmax10 scratch run
+  except for cap 3 and a distinct dated output label. Same localized_0plus
+  seed, T=0.30, Fs1=5.4, 60 radial nodes, AA20/history10, tolerance 2e-6,
+  600-map maximum, ten ranks, signed diagnostics and per-map checkpoints.
+- Checked shell syntax and runner input preparation before the build boundary;
+  no production run launched and no solver mathematics changed. Comparison
+  across caps will estimate a useful setting for this case, not a universal
+  optimum.
+
+## 2026-10-02 — Completed pmax10 Anderson analysis
+
+- Analysed 261002-111709: clean convergence at 224 maps, RMS 4.6496241e-7,
+  max 1.9651752e-6. Initial arrays match other scratch comparisons exactly;
+  signed norms and state/update continuity verified. No solver run launched.
+- Updated comparison script/figure and LaTeX note: pmax10 takes 39.1% more
+  recorded maps than staged pmax5 (161), with 18 residual reversals and three
+  RMS doublings versus four and zero. Retained restart and timing caveats.
+  Final largest residual: Re Axz at r=35.93. No solver changes.
+
+## 2026-10-02 — Completed Anderson comparison and pmax10 scratch launcher
+
+- Tight continuation 261002-094542 converged in 81 additional maps, 161
+  recorded maps combined (including repeated restart evaluation), 159 applied
+  updates. Final RMS/max: 2.9687656e-7 / 1.9918183e-6. Both AA segments exited
+  cleanly. Verified initial scratch fields match BB/Polyak and signed norms
+  and state continuity, including the restart boundary.
+- Comparison script/figure and LaTeX note now include Anderson equations,
+  threshold crossings, signed alignment and regional endpoint diagnostics.
+  AA reaches p=5 on 105 applied steps, with no RMS doublings and four negative
+  consecutive-residual cosines. No solver mathematics changed.
+- Prepared tools/run_radial_anderson_p10.sh: fresh localized_0plus seed,
+  pmax10, tolerance 2e-6, 600-map maximum, otherwise same AA20/physics/mesh.
+  Checked shell syntax and actual runner input preparation, including overrides
+  and absence of restart. All 13 runner tests passed. Not launched.
+
+## 2026-10-02 — Tight Anderson continuation prepared
+
+- Completed AA20/pmax=5 run 261002-091852 converged after 80 maps at max
+  residual 1.9863203883e-5 and RMS 3.2541002426e-6.
+- Added tools/continue_radial_anderson_tight.sh: saved final fields, same
+  physics/grid/AA settings, tolerance 2e-6, up to 600 additional maps, signed
+  diagnostics and checkpoints every iteration. New dated output directory;
+  parent history is archived and concatenated for plotting, not overwritten.
+- Internal AA history starts fresh; parent ends at cycle position 20. First
+  continuation map re-evaluates the saved state (not a bitwise uninterrupted
+  iterator restart). Production continuation left for the user to launch.
+
+## 2026-10-02 — Anderson launcher missing optional controls
+
+- Fixed input preparation when selecting Anderson with the BB scratch inputs:
+  the runner now inserts omitted history-limit, progress-threshold and maximum-
+  mixing controls, instead of requiring them to exist in the source namelist.
+- Added regressions exercising actual runner input preparation for both 0plus
+  and plus0 with the diagnostics launcher's settings, stopping before build/MPI.
+  Unknown missing keys remain errors. No solver or numerical settings changed.
+
+## 2026-10-02 — Accelerator comparison note and matched Anderson run
+
+- Analysed completed Polyak 0plus run: 600-map limit, max residual 8.44e-6,
+  not converged at 2e-6. At 2e-5, BB/Polyak cross at 115/319 maps. Verified
+  exactly equal archived initial fields. Polyak launcher exits cleanly.
+- Added LaTeX note with equations, signed BB patterns, Polyak comparison,
+  limitations and a pending Anderson section, plus reproducible figures.
+- Prepared (not launched) AA20/no-simple scratch run with history 10, pmax 5,
+  tolerance 2e-5, maximum 600 maps, ten ranks and a separate build directory.
+  User may override tolerance for the tighter comparison.
+- Generalized radial signed state/residual/applied-update recording and
+  regional RMS/max summaries to Anderson and Polyak; BB-only metadata is not
+  written for other engines. No accelerator mathematics changed.
+- Bounded one/two-rank integration tests passed. A two-rank 22-map test crossing
+  the AA20 reset gave bitwise identical fields and non-timing histories with
+  recording on/off; verified signed state continuity and reset p=0.01.
+  All 11 Python runner tests passed. Long production run remains for the user.
+
+## 2026-10-01 — Completed signed BB run analysis
+
+- Analysed the 433-map radial 0plus diagnostic run without changing solver
+  parameters or run data. Independently verified state/update continuity,
+  residual norms and signed BB estimates; max-residual history exactly matches
+  the earlier 433-map scratch run.
+- Distinguished positive secant curvature from repeated residual reversals,
+  local Fermi-liquid spikes from slow outer order-parameter relaxation.
+  Leading late residual pattern is strongly rotation-like outside r=15;
+  this is not a demonstrated removable zero mode or a physical eigenmode.
+- Saved reproducible analysis, figures and qualified conclusions under
+  work/signed-bb-analysis. Noted the repeated abnormal MPI launcher exit despite
+  numerical convergence and complete consistent signed diagnostic files.
+
+## 2026-10-01 — Polyak momentum accelerator
+
+- Added modern Fortran Polyak heavy-ball iteration following SuperConga
+  Appendix E, E4/E6/E7, with step size 2 and drag 0.5 as in Listing 14.
+  This is fixed-step momentum, not objective-value-based Polyak step sizing.
+- Integrated optional root-owned momentum into serial/MPI state updates and
+  the axisymmetric benchmark driver (radial and full-2D modes), with namelist
+  and Python controls, metrics and engine=3 convergence-plot labels.
+- Added a matched 0plus/plus0 radial scratch launcher, separate build directory,
+  and usage notes. No existing run/input was overwritten or production job
+  started. Field restarts deliberately reset momentum; BB/AA are unchanged.
+- Checked recurrence, startup/reset, Picard limit, no converged-state drift,
+  invalid/nonfinite controls, masked/unmasked state updates and frozen points.
+  All 39 non-MPI CTests and 11 runner tests passed in the isolated checked build;
+  bounded radial tests passed with one/two MPI ranks and equal mapped states.
+  A separate four-update full-2D two-rank Polyak smoke test also passed,
+  including history labels, fixed step size and convergence-plot generation.
+
+
+## 2026-10-01 — NAISS Josephson-device science objective
+
+- Added a concise project description linking spin-resolved 3He validation to
+  planned Josephson weak links, superconducting–magnetic hybrids and
+  Josephson-diode circuit elements for quantum technology.
+- Expanded the technical appendix with planned interfaces/leads/spin transport,
+  current–phase relations, diode observables and phase-sweep workload.
+  Distinguished spin-dependent mechanisms from other possible diode mechanisms.
+- Kept the current pilot budget unchanged and explicitly deferred numerical
+  resource estimates for device campaigns until their implementation is benchmarked.
+
+## 2026-10-01 — Opt-in signed radial BB diagnostics
+
+- Added independent-node state/residual/applied-update recording, component
+  layout metadata, raw signed BB1/BB2 secant estimates, signed curvature and
+  residual alignment, validity flags, and regional RMS/max residuals.
+- Diagnostics are optional, rank-zero only, after the map and selected update
+  and before advancing state. Existing scalar history format is unchanged.
+  Recording adds no map evaluations and does not modify BB selection.
+- Added a separate diagnostic scratch launcher/build; left the running plus0
+  executable, archived inputs and existing scratch launcher unchanged.
+- Verified bitwise identical BB updates with recording enabled/disabled in a
+  20-step test; signed candidate formulas and update/residual consistency in
+  bounded one-/two-rank radial tests. All 33 non-MPI CTests and 10 runner tests
+  passed. Avoided the ten-rank suite while the user runs plus0.
+
+## 2026-10-01 — BB temporal/spatial spike comparison
+
+- Analysed three completed 2D segments (298 maps total) and the 266-map radial
+  run. Saved a reproducible diagnostic script and separate artifacts under
+  work/bb-spike-analysis; did not modify solver settings or running jobs.
+- Found recurrent roughly six-step spikes with later spectral broadening,
+  strong lag-aligned alpha/error-growth association, and a radial alternation
+  between near-core spike maxima and extended outer residual between spikes.
+- Documented different F1s/geometry/initial states, restart segmentation and
+  the limits of unsigned residual snapshots. Proposed signed residual/state
+  recording before changing acceleration; spike suppression alone is not
+  a demonstrated route to faster convergence.
+
+## 2026-10-01 — Direct Fs1 input and matched radial BB scratch seeds
+
+- Added optional fs1 to both modern solver namelists and --fs1 to the radial
+  runner. Explicit Fs1 overrides legacy feedback_scale via Fs1/(1+Fs1/3);
+  omitted Fs1 preserves archived input behavior. Current nonnegative-Fs1
+  restriction is retained, and resolved parameters are reported.
+- Prepared independent localized_0plus / localized_plus0 inputs at T=.30,
+  Fs1=5.4, 60 radial points, automatic poles/gap, 600-update limit and per-update
+  checkpoints. Added a sequential ten-rank launcher with a separate build.
+  These seeds do not initialize from preserved converged reference data.
+- Verified both real inputs through MPI prepare-only startup: each has 60
+  independent points and the resulting fields differ as expected. Fs1 conversion,
+  zero feedback and legacy preservation tests pass; runner tests pass.
+  Long production runs are left for the sequential launcher.
+
+## 2026-10-01 — Temperature-consistent bulk gap at startup
+
+- Reduced the supplied new_src/bulkgap.f90 zero-flow irep=1 branch to its
+  isotropic scalar equation; retained the original Matsubara cutoff as an
+  explicit legacy option. The original files remain unchanged.
+- Added a bounded bracket/bisection solve using the current Ozaki quadrature.
+  Auto mode selects this for generated poles and preserves manual gaps for
+  legacy file-based inputs. Both modern drivers resolve the gap before seed
+  construction and endpoint setup, print it, and record it in metrics.
+- T=.30 gives legacy 0.279946155719 versus Ozaki 0.279894824068. Documented
+  the cutoff difference, units, B-phase scope and unchanged reference profiles.
+- Verification: all 38 CTests and 9 runner tests passed; bounded radial BB/AA
+  tests retain file/generated-table and 1/2-rank agreement, and the prepared
+  radial example reports the automatically calculated gap. Compared the legacy
+  reduction with the original compiled gap program; checked monotonicity,
+  vanishing gap at Tc and the discrete Ozaki gap equation over T=.1 to .9.
+  No production run started.
+
+## 2026-10-01 — Startup Ozaki quadrature generation
+
+- Adapted the supplied colleague's Ozaki cutoff table and DSYGV algorithm to
+  explicit real64 and a checked LAPACK interface. Original external sources
+  unchanged; attribution/redistribution permission remains to be established.
+- Added temperature, ozaki_cutoff and ozaki_mode to both modern solver drivers;
+  retained file mode for old inputs and enabled generation in the radial example.
+  Actual tables are archived beside metrics, without a shared ozaki.dat write.
+- Added radial-runner temperature/cutoff overrides and documented remaining
+  manual bulk-gap/material and reference-profile consistency requirements.
+- Generated T=0.30/cutoff=50 table agrees with preserved poles, residues and
+  gap prefactor; lower-temperature T=0.10 yields 14 valid poles. All 34 CTests
+  and 9 runner / 5 scaling Python tests passed after allowing local MPI sockets.
+  Direct two-update radial tests agree for generated versus file-based tables,
+  and for generated tables across one/two MPI ranks, with the source table
+  deliberately absent in generation mode. Zero-temperature, negative-cutoff
+  and over-limit-cutoff rejection tests were added. No production relaxation launched.
+
+## 2026-10-01 — NAISS planning and bounded MPI scaling harness
+
+- Drafted a technical appendix and a provisional allocation budget, separating
+  measured laptop costs from illustrative campaign sizes and cluster assumptions.
+- Added a standard-library-only strong-scaling harness, dry preparation by
+  default, fixed-state single maps, bounded execution, separated logs, numerical
+  agreement checks, provenance and repeated timing summaries. Added a portable
+  Slurm submission template with no invented account/partition.
+- Documented replicated-state MPI limits, timing exclusions, restart semantics,
+  unresolved laptop MPI shutdown risk and scheduler charging/memory checks.
+- Current radial example's user-edited 400-iteration setting was preserved.
+  No allocation submission or production calculation was launched.
+- Five harness unit tests passed. A bounded 113-point one/two-rank MPI smoke
+  campaign completed with identical mapped outputs and clean launcher exits;
+  map timings were 10.61/5.57 seconds. Logs and provenance are retained under
+  work/hpc-scaling/261001-083646-781960. This is not a cluster scaling claim.
+
+## 2026-09-30 — Opt-in symmetry-constrained radial solve
+
+- Added radial_symmetry mode to the current MPI benchmark driver. Maps and
+  BB/Anderson updates act only on independent +x ray nodes; direct 1D sampling
+  reconstructs tensor harmonics and vector mean fields at trajectory points.
+- Fits evolve from current ray data, origin regularity is projected, and
+  incompatible seeds/settings are rejected. Full 2D remains the default.
+- Full-plane output/cache is retained for plot/restart compatibility; radial
+  residual plots and annularly weighted metrics distinguish the reduced solve.
+- Added a 60-point A-phase reference example, launcher and usage documentation.
+  Built separately; all 34 CTest tests passed. Bounded BB/AA MPI checks passed,
+  including one/two-rank equivalence. No production relaxation launched and
+  no changes to the running overnight process. CongAcc remains the next step.
+
+## 2026-09-30 — Separate MPI/runtime diagnostics from progress
+
+- Future axisymmetric-runner launches send launcher/rank stderr directly to
+  mpi.log, while solver stdout remains visible and archived in run.log.
+  PMIx verbosity and finalization timeout are preserved for diagnosis.
+- This log includes Fortran runtime stderr as well as MPI messages. Failed
+  launches still fail and point to both logs; no quiet/ignore-error flags.
+- Tested stdout separation, large stderr output and nonzero-exit reporting.
+  The already-running overnight process is unchanged.
+
+## 2026-09-30 — Prepared tight-tolerance BB continuation
+
+- Added tools/continue_0plus_bb_tight.sh, restarting the converged 198-map
+  state on unchanged discretization with maximum-residual tolerance 2e-8,
+  at most 100 additional maps, 10 ranks and checkpoint every iteration.
+- Separate build/output directories; combined history extends the existing
+  198 rows. BB history resets explicitly. No production job launched.
+- Documented runtime budget, live inspection and the distinction between
+  nonlinear residual convergence and continuum discretization accuracy in
+  docs/BB_TIGHT_CONTINUATION.md.
+
+## 2026-09-29 — Prepared BB updates 101–200 with combined history
+
+- Added continue_0plus_bb_100.sh to restart the completed radial-style BB
+  run from its saved final field, preserving physical and iteration settings.
+  Requests 100 additional updates in a fresh directory and separate build.
+- Runner can archive a completed parent history and produce a combined
+  history with global numbering, local numbering, segment and explicit restart
+  marker. Combined convergence plot marks the fresh BB history at update 101.
+- Existing data is never appended in place; field/spatial snapshot files
+  remain in their original segments. Parent history is checksummed in the
+  new manifest. MPI failure handling is unchanged.
+- Added concatenation/schema/numbering/source-preservation regression tests
+  and docs/CONTINUING_BB_100.md. No production run launched.
+
+## 2026-09-29 — MPI shutdown investigation and bounded timeout mitigation
+
+- Verified all ten rank audits from the 100-update radial-style BB run:
+  MPI_Finalize returned success and MPI_Finalized was true on every rank.
+  The reported improper exit is not explained by a missing finalize call.
+- Inspected installed Open MPI 5.0.9 / PMIx 5.0.9 and upstream finalize
+  source: PMIx's 10-second ACK timer can expire while returning success.
+- Added an isolated two-rank fault-injection probe. With its test-only
+  async-finalize setting and a 15-second launcher pause, the 10-second
+  allowance produced timeout messages and launcher exit 1 (PMIX_ERR_UNREACH)
+  despite successful rank audits. Timeout 60 produced exit 0 and no timeouts.
+  This is NOT the exact production warning and does not establish the cause
+  of any production launcher delay. See work/mpi-shutdown-dvdfnf65.
+- Current 2D Python runner now defaults to a 60-second PMIx ACK allowance
+  and client diagnostics on macOS only, preserving user environment overrides.
+  No warning suppression, forced success, global shell changes or MPI upgrade.
+  Legacy direct MPI launches and the separate double-core runner are unchanged.
+- Added finalize elapsed time and selected settings to new rank audits,
+  and settings to the runner manifest. Documented limitations and next-run
+  validation in docs/MPI_SHUTDOWN_INVESTIGATION.md.
+- Verification in a separate shutdown-verification-build: all 33 CTests
+  passed (including 1/4/10-rank MPI), as did six Python runner tests.
+  Normal tested finalization remained millisecond-scale, not a fixed 60s wait.
+  Long-run validation remains outstanding; no production job was launched.
+
+## 2026-09-28 — Radial-style BB comparison and completed-run harmonic profiles
+
+- Changed compare_0plus_bb.sh to initial=1, min=0.001, max=100, absolute
+  curvature and growth_limit=0. Zero explicitly disables growth damping
+  without evaluating a division by zero. Generic solver defaults are unchanged.
+- Preserved the controlled same-field comparison, 60-update limit, separate
+  BB build and fresh run directory; no production run launched. The launcher
+  does not add the radial driver's five preliminary NN updates.
+- Completed-run plotting now includes harmonic_axis_profiles.png with
+  starting/final-state panels, plus harmonic radial-reference comparisons
+  when those plots are requested. Existing checkpoint harmonic plots remain.
+- Generated and visually checked harmonic_axis_profiles.png for the completed
+  260927-175041 BB run; no field data was altered.
+- Verification: 28 non-MPI CTests, two axis-profile and five runner Python
+  tests passed; a two-rank four-update radial-style BB smoke/plot test passed.
+  Added tests for disabled growth damping, startup=1 and the cap of 100.
+
+## 2026-09-27 — Independent modern BB engine
+
+- Added barzilai_borwein_mixing with owned/resettable state and alternating
+  BB2/BB1 steps computed from actual active-vector displacements. Root owns
+  history; the existing MPI adapter broadcasts the updated OP/FL state.
+- Added positive-curvature (default) and historical-style absolute-curvature
+  options, bounded steps, denominator/finite checks, and next-step damping on
+  residual growth. This is explicitly not a line search or rollback scheme.
+  Defaults are startup 0.1, bounds [0.001,5], growth threshold 2.
+- Added BB selection/parameters to the current 2D driver and runner, with
+  method/safeguard/quotient/bound diagnostics and compatible convergence plots.
+  The old radial BB code is unchanged; Anderson remains the default.
+- Added compare_0plus_bb.sh and docs/BB_ITERATION.md. Launcher uses the same
+  initial field as the AA comparison and a separate work/bb-iteration-build.
+  Neither the running AA executable nor its run data was modified.
+- Verification: all 33 CTests passed, including MPI at 1/4/10 ranks; five
+  Python runner tests passed. A two-rank, four-update BB smoke run and plot
+  passed. Unit tests cover formulas, actual displacements, curvature modes,
+  bounds, growth/degeneracy safeguards, reset, zero residual, and active-mask
+  preservation for both fields. No production BB run was launched.
+
+## 2026-09-27 — AA restart-only comparison and BB review
+
+- Allowed simple_cycle_iterations=0: uninterrupted AA with fresh history
+  every configured block, e.g. updates 21 and 41 for a 20-update block.
+- Added compare_0plus_aa_restart.sh, using the same starting field as the
+  AA20/simple3 experiment and requesting 60 updates; no production job launched.
+- Extended the two-rank cycle regression to check zero-simple-step scheduling.
+- Verification: all 32 CTests and four Python runner tests passed. The
+  two-rank 24-update AA20/simple0 integration test passed, including fresh
+  history at update 21 and plotting. Shell syntax and diff checks passed.
+- Reviewed new_src/iter_BB.f90, its caller and packing code; documented the
+  alternating scalar secant formulas, undefined intent(out) alpha reuse,
+  unguarded denominators, normalization, and reset/step-safeguarding concerns
+  in docs/BARZILAI_BORWEIN_REVIEW.md. No legacy BB code changed or port claimed.
+
+## 2026-09-26 — Configurable Anderson/simple-update cycles
+
+- Added optional AA20/simple3 cycling to the current general 2D benchmark
+  driver and command-line runner. Existing inputs default to uninterrupted AA.
+- Simple updates damp both active OP and FL vectors with configurable p
+  (initial recommendation 0.1); they do not accumulate AA history. Each new
+  AA block clears history and restores the legacy initial mixing of 0.01.
+- Preserved residual convergence checks, halo updates and checkpoint behavior.
+  Added method and cycle-position history columns, terminal labels and plot
+  method shading/reset markers, with backward-compatible old-history plotting.
+- Added adapter regressions and a two-rank 24-update integration check, plus
+  a non-destructive restart launcher and docs/CYCLED_ITERATION.md.
+- Latest reference history shows slow progress and increasing residuals at
+  steps 49–50; cycling is a controlled experiment, not a proven remedy.
+- Verification: Debug build and 27 non-MPI CTests passed; optimized Release
+  build passed all 32 CTests (including MPI at 1/4/10 ranks). Four Python runner
+  tests passed. The two-rank 24-update integration check passed, confirming
+  AA20/simple3/fresh-AA1, p=0.1 during simple steps and p=0.01/md=1 on restart,
+  plus generation of the method-aware plot. Old-history plotting also passed.
+  The smoke fixture explicitly permits iteration_limit, since it tests the
+  schedule rather than convergence. No production job launched.
+
 This file records analysis, decisions, changes, verification results, and open
 questions for the modernization of the legacy Fortran/MPI vortex solver.
 
@@ -2299,3 +2703,750 @@ was launched; this is an experimental confinement branch, not a converged
 surface benchmark. Finite-path endpoints, reflection-step convergence, the
 legacy wall displacement and grazing policy, and the full 2D boundary backend
 remain explicit gates in `docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md`.
+## 2026-09-20 - Legacy double-core reference figure set
+
+Added a one-command plotting route for the archived `T/Tc=0.30`, `F1s=5.4`
+double-core solution. The tool reconstructs the complete 601 by 601 complex
+order-parameter matrix and three-component current-related Fermi-liquid field
+directly from `op_x`, `op_y`, `op_z`, and `curr`, then applies the same
+Cartesian and orthonormal spherical-basis plotting functions used for modern
+runs. It validates coordinates and all redundant stored norms before plotting.
+
+The reference output contains the five comparable final-state maps for both
+the full `[-60,60]^2 xi0` archive and a `[-30,30]^2 xi0` core window, a
+dcvlong-Fig.-4 symmetry-axis profile, and a convergence figure that keeps the
+preliminary and Anderson records from the last `qcv.log` block explicitly
+separate. A JSON manifest records provenance, conventions, validation errors,
+the unavailable iteration-resolved diagnostics, and the measured half-core
+positions. For the supplied archive the minima are at `y=+/-11.8 xi0`, hence
+the legacy hard-core separation is `23.6 xi0`.
+
+Generated PNGs remain below the separately archived and Git-ignored
+`2D_benchmarks/` tree. The maintained plotting tool and documentation are
+tracked; the historical `Cpp`--`Cmm` files are not used because their mixed
+harmonic components follow both a factor-of-two amplitude convention and a
+different mixed-zero filename ordering from the orthonormal FermiForge basis.
+The reference manifest records numerical extrema for assigning identical
+colour limits in a later legacy-versus-modern comparison.
+
+## 2026-09-20 - Converged-reference starting configurations
+
+Added the Fortran `legacy_resampled` initialization mode. Rank zero imports
+all nine complex order-parameter and three real Fermi-liquid field components,
+constructs the requested modern mesh, and transfers the fields with the
+existing bilinear sampler before broadcasting. Out-of-domain target points
+are rejected. The native legacy mesh remains available through `legacy_split`.
+
+Added `tools/run_converged_reference.py` to prepare and execute double-core,
+normal-core, and A-phase-core reference tests with source hashes and archived
+inputs. Double-core tests use archived 64-by-11 quadrature, eight poles,
+Delta=0.2799462 and F1s=5.4. Frozen-exterior and evolving-asymptotic-exterior
+cases are selectable. The radial cases use preserved converged `new_src`
+profiles and radial-reference endpoints. Zero iterations measures the initial
+map defect; positive iteration counts use the existing Anderson/checkpoint
+path. The double-core runner now accepts imported states and zero-update runs
+without incorrectly rejecting their terminal status or requiring a checkpoint.
+
+Ten-rank native and resampled double-core probe maps passed. Native-grid
+maximum absolute residual was 3.8069e-4 with normalization error 1.1145e-15;
+the imported field therefore is not yet an exact fixed point of the current
+map. The coarse mesh samples different half-core coordinates, so its smaller
+residual is not evidence of better accuracy. Independent Python interpolation
+matched every transferred field component exactly in the tested mesh. A
+two-update, three-updated-point integration check passed and wrote a complete
+restart checkpoint; it is not a full active-domain convergence test.
+
+The preceding 20-update production history was also checked: update RMS went
+from 1.5865e-5 to 1.6059e-5 as separation grew from 19.2 to 20.0 xi0. This
+motivates the reference-start comparison without assuming that slow core-size
+relaxation alone explains the plateau. Instructions and limitations are in
+`docs/RUNNING_CONVERGED_REFERENCES.md`.
+
+Repeating the transfer with central spacing 0.2 xi0 recovered the native
+23.6 xi0 separation and matched the native-grid half-core residual:
+maximum 3.8096e-4, core relative L2 1.4238e-3, normalization 1.2212e-15.
+This check samples the same half-core coordinates and rules out coarse
+half-core placement as the sole cause of the discrepancy. Exterior-mesh
+sensitivity remains visible in the outer probe residual.
+
+The full default normal-core zero-update check completed on ten ranks in
+295 s using the release build: 2037 active points, exact input embedding,
+map relative L2 residual 1.0544e-2 and maximum residual 6.2595e-3.
+Plots were generated under runs/260920-181511-normal-converged-reference-converged-radial-reference/plots.
+A compact A-phase check (109 active points, not the default full mesh) also
+completed, with exact embedding, relative L2 residual 7.979e-3 and maximum
+residual 3.9477e-3. These are successful workflow tests, not demonstrations
+that the modern map reproduces the radial fixed point. No full-domain
+multi-iteration reference relaxation was attempted. The wrapper now uses
+the release double-core build directory for both reference families.
+
+## 2026-09-20 - Full-domain legacy-reference validation launched
+
+Fixed the zero-update plotting success check: such runs intentionally make
+14 plots rather than the 16 expected for an iterative run. Added
+tools/run_legacy_reference_relaxation.py to run an initial full-active-domain
+map, three Anderson updates from the same imported state, and a separate
+zero-update map restarted from the resulting full-state checkpoint. The
+last stage avoids confusing pre-update residuals with final-state residuals.
+Each stage stops the sequence on failure and records its report in a batch
+status file; execution success remains separate from physical convergence.
+
+Launched runs/260920-183515-legacy-reference-validation with ten MPI ranks,
+central spacing 0.2 xi0, active ellipse radii 28/32 xi0, frozen legacy exterior,
+and no zero-mode projection. Verified ten solver workers were running in
+the initial-map stage. This is a multi-hour batch; results were not yet
+available at launch. Original archive and previous runs remain unchanged.
+Python compilation and git diff whitespace checks passed.
+
+## 2026-09-21 - Spatial residual history
+
+Added pre-update raw residual snapshots at every double-core map evaluation
+and a compact peak-coordinate history distinguishing point RMS from the
+largest real-component defect, restricted to the actual update mask.
+Added automatic white-to-indigo residual maps and peak tracks; retained
+the legacy sampled-file columns and appended the update mask. Generated
+comparison plots from the three available saved maps of the completed
+legacy-reference validation batch under its residual_diagnostics directory.
+The final component maximum is at (0,11.6), whereas the RMS maximum is at
+(-1.2,-11.8). Near-symmetric peak switching is not physical core motion.
+Visible bands around the fine-grid transition merit a later resolution
+check. No new full-domain production solve was launched.
+
+Rebuilt the Fortran executable and passed a ten-rank, two-update sparse
+smoke run (260921-112148-residual-tracking-smoke), including automatic plots.
+This exercised two snapshot files and the appended coordinate history.
+
+## 2026-09-21 - F1s=0 legacy reference plots
+
+Generated the same 12 reference PNGs and provenance/validation manifest for
+2D_benchmarks/Double_core_vortex_T=0.30_Fs1=0.0 under its plots directory.
+Used the existing archive plotting tool without changing source data or
+solver settings. Confirmed T/Tc=0.30 and F1s=0 from qcv.inp. Grid is 601x601,
+[-60,60]^2 with 0.2 spacing. Half-core minima are y=+/-3.2, giving a=6.4 xi0
+versus 23.6 xi0 for the F1s=5.4 archive. Stored norm/density consistency
+differences are at most 1.04e-6. Visually checked axis and harmonic panels.
+Full and +/-30 core windows retain the earlier figure conventions, including
+common component amplitude scales, white-indigo amplitudes, and diverging
+phase colours. Smaller hard-core separation supports using this benchmark
+for cheaper mesh/interpolation tests, but does not by itself determine a
+sufficient outer computational radius. The archive curr vector is nonzero
+even for F1s=0; its conversion to solver mean fields must be checked before
+using it as an initial condition, not inferred from the filename alone.
+
+## 2026-09-21 - Compact F1s=0 production input
+
+Prepared examples/2d_double_core_Fs1_zero_reference.nml and
+docs/RUNNING_FS1_ZERO_REFERENCE.md for a user-launched 20-update run.
+The archive is resampled onto [-20,20]^2; spacings are 0.2/0.4/0.8 with
+transitions at 6/12. An equal-axis ellipse of radius 16 is iterated, with
+nested fit surfaces 12/15 and a dependent exterior halo. Retained bilinear
+interpolation, disabled zero-mode projection, and enabled passive exterior
+probes, full-state checkpoints and per-map residual diagnostics. Confirmed
+the trajectory self-energy multiplies the stored current-related vector by
+feedback_scale; setting it to zero is correct, without erasing the vector.
+
+A reduced-angle/coarse-mesh one-update ten-rank setup check passed in
+runs/260921-114959-Fs1-zero-setup-smoke, including fresh final passive-probe
+evaluation, checkpoint and plots. During setup, corrected the required
+checkpoint placeholder and selected the existing elliptical halo controls
+so the radius-16 active mask does not overlap the dependent halo. This
+smoke test validates execution, not production accuracy. The 20-update
+production calculation was not launched.
+
+## 2026-09-21 - Controlled quadratic trajectory interpolation
+
+Added trajectory_interpolation_order (default 1, optional 2) to the double-core
+namelist and metrics/report. The quadratic option uses actual nonuniform
+coordinates, averages the two endpoint-bracketing quadratic polynomials per
+interior cell, and takes their tensor product (up to 16 nodes); domain-edge
+cells use one-sided quadratics. Both real/imaginary matrix entries and the
+current-related vector use these cached weights. Initial legacy transfer
+and asymptotic coefficient sampling remain bilinear to isolate the transport
+change. Quadratic weights are unbounded by a limiter and only C0 continuity
+is guaranteed; improved physical accuracy is to be measured, not assumed.
+
+Prepared examples/2d_double_core_Fs1_zero_quadratic.nml from the archived
+input of runs/260921-115501-double-core-Fs1-zero-reference. Automatically
+verified all controls match except interpolation order and output paths.
+The documented command stops at ten updates and starts from the original
+legacy archive, not the ten-update linear checkpoint. The user will run it.
+
+All 32 CTest cases passed. Extended field tests verify complex and real
+tensor-quadratic exactness on unequal nonuniform axes, included boundaries,
+partition of unity and out-of-domain rejection. Trajectory tests exercise
+both interpolation selections. A ten-rank reduced-resolution one-update
+quadratic smoke test passed, including plots and checkpoints; its initial
+field is byte-identical to the matched linear smoke test. No production
+comparison was launched. Details: docs/QUADRATIC_INTERPOLATION_COMPARISON.md.
+
+## 2026-09-22 - Smooth Cartesian economy test
+
+Added the selectable smooth sinh-mapped Cartesian mesh, leaving existing
+mesh defaults unchanged. Its cell count and stretch independently control
+resolution and grading. Prepared examples/2d_double_core_Fs1_zero_smooth.nml:
+65x65 nodes over [-20,20]^2, stretch 2.3, 3065 active points instead of
+9309, with unchanged quadratic trajectory, quadrature, physics, mixing and
+asymptotic controls. The reduction changes resolution as well as grading;
+it is an economical exploratory test, not a matched-resolution proof.
+The smooth grid samples the initial half-core separation at 6.338 rather
+than 6.4 because the nearest nodes moved, not because the vortex relaxed.
+
+Mesh tests passed for symmetry, origin/endpoints, monotone spacing, bounded
+adjacent growth, point count and uniform limit. A ten-rank one-update test
+on the actual smooth mesh with deliberately reduced angular/integration
+resolution passed, including halo, passive probes, checkpoints and plots:
+runs/260922-082404-Fs1-zero-smooth-smoke. Production was not launched;
+instructions are in docs/SMOOTH_GRID_TEST.md. Whitespace checks passed.
+
+## 2026-09-22 - A-phase boundary comparison and MPI shutdown investigation
+
+Extended the axisymmetric reference driver with selectable smooth Cartesian
+meshes and quadratic trajectory interpolation, preserving its old defaults.
+Added per-map raw residual snapshots and automatic spatial/peak plots.
+Prepared two ten-update user-run inputs at T/Tc=0.30, F1s=5.4, using the
+preserved A-phase profile: radial-reference continuation versus fitted
+radial asymptotics. Both use 65x65 smooth grids and radius-16 active masks.
+The latter fit is obtained from the preserved radial reference, not an
+evolving 2D fit; this distinction is documented. Iteration-limit success
+is opt-in for these tests and is not physical convergence.
+
+Audited normal shutdown paths: both drivers already call MPI_Finalize;
+no outstanding nonblocking requests were found in the MPI field-map module.
+The executable links Homebrew Open MPI (mpifort version 5.0.9). No proven
+cause of the long-run improper-exit warning was established. Removed the
+unsupported sleep/resume explanation and the double-core wrapper's silent
+equation of completed output with successful shutdown. It now preserves
+completed products but reports calculation success and launcher success
+separately, with overall failure on a nonzero launcher exit.
+
+Added per-rank shutdown audit files recording runtime version, entry to
+MPI_Finalize, its return code and MPI_Finalized status after return in both
+drivers. Two coarse one-update A-phase tests passed on ten ranks, with all
+twenty audit files confirming successful finalization and no launcher
+warnings. This instrumentation is diagnostic, not a demonstrated fix for
+the multi-hour failure. Production comparison remains for the user.
+Instructions: docs/A_PHASE_BOUNDARY_COMPARISON.md and
+docs/MPI_SHUTDOWN_INVESTIGATION.md.
+
+All 32 regression tests passed after these changes; Python compilation
+and whitespace checks also passed.
+
+## 2026-09-22 - Repeated-restart namelist bug fixed
+
+The axisymmetric runner's scalar substitution stopped at '/' even inside
+a quoted value. Replacing an already-populated absolute restart filename
+therefore left the old filename appended after the new closing quote.
+Fortran interpreted the unquoted slash as the namelist terminator and
+retained maximum_iterations=0, despite the later text showing 20. This
+explains the unintended single-map run 260922-150423. Its output field
+is numerically identical to the original restart field (maximum difference 0).
+
+Fixed quote-aware substitution, including doubled Fortran quotes, and added
+tests for repeated restart and quoted punctuation. Added a post-run guard
+comparing the actual Fortran iteration limit with the prepared input.
+The small ten-rank repeated-restart regression completed two genuine updates
+and reported iterations/maps=2/2 in
+runs/260922-151730-repeated-restart-regression-radial-reference. Parser tests
+and whitespace checks passed. User may rerun the original command; no long
+production restart was launched and original run files were not modified.
+
+## 2026-09-22 - Axis profiles for axisymmetric-core runs
+
+Added automatic plots/axis_profiles.png to the axisymmetric runner, using
+the same dcvlong Fig.4-style plotting routine as the double-core workflow.
+The routine now accepts a neutral or A-phase-specific title. Both starting
+and final state are shown with shared normalization and vertical limits.
+Generated plots retrospectively for 260922-132952 and 260922-150423 A-phase
+runs; visually checked the shared-memory result. The latter was a zero-update
+run, so its start/end profiles coincide. No solver run or source data change
+was needed. Python compilation and whitespace checks passed.
+
+## 2026-09-22 - Residual iteration dynamics
+
+Added tools/plot_residual_dynamics.py to generate separate RMS and
+maximum-component residual montage PNGs and animated PNGs from saved map
+snapshots. Each metric uses a fixed white-to-indigo scale across iterations;
+grey denotes unmeasured points and a cross identifies a peak location.
+Map labels explicitly identify the pre-update state. Generated the first
+17 saved maps of 260922-152321-a-phase-continued-radial-reference without
+changing the running solver or its data. A JSON manifest records inputs
+and colour limits. Verified animation frame counts, inspected the RMS
+montage, and passed Python compilation and whitespace checks.
+
+## 2026-09-22 - Recover completed A-phase plots and radial comparison
+
+Added tools/recover_axisymmetric_plots.py, a solver-free postprocessor with
+an explicit same-grid radial-reference input. Recovered field/harmonic,
+density/current-proxy, convergence, axis-profile, and residual plots for
+260922-152321, including all 20 maps in the residual dynamics. Compared
+against the unperturbed radial embedding input_fields_2d.dat in 260922-125102,
+not against an already-relaxed restart state. Added full signed-axis complex
+component overlays, absolute difference maps, and density/current-related
+mean-field overlays. Source paths recorded in recovered_plot_provenance.json.
+No phase alignment or normalization is applied to component differences.
+
+Independent area-weighted comparison reproduces solver gap relative L2
+0.0942917493743 and mean-field relative L2 0.0405449728502. X-axis imaginary
+A_xy shows a substantial sign/profile difference requiring investigation;
+small self-consistency residual alone is not radial-reference agreement.
+Inspected component and density/current comparison plots. Python compilation
+and whitespace checks passed. No solver rerun or alteration of saved fields;
+the recorded MPI launcher failure remains unchanged.
+
+## 2026-09-22 - Full tensor embedding and evolving axisymmetric-run tails
+
+Physical radial embedding and reconstruct_axial_cartesian now use the full
+harmonic inverse. The historical Axy=-Ayx transport projection is retained
+only as an explicit profile opt-in in compare_radial_point_map, which prints
+its legacy mode. Initially the two historical-map comparisons failed after
+the physical correction; explicit compatibility mode restores their original
+purpose and tolerances without changing the production embedding.
+
+Added state_asymptotic to the axisymmetric driver and Python runner. It uses
+the common current-state fit for trajectory tails and refreshes the dependent
+halo before solving and after every update. No core-type selection is used.
+The driver saves a freshly embedded full-tensor radial reference for plotting.
+The runner attempts saved-output plotting after launcher failure and retains
+the failure in the manifest and exit status. Added continuation instructions
+in docs/EVOLVING_ASYMPTOTIC_RESTART.md for five updates from the user's saved
+20-update result with fitting radii 10 and 14, active radius 16. Sampling the
+matching circle's bilinear stencil gave maximum corner radius 15.0863, inside
+the active domain. Matching-radius adequacy is not yet physically validated.
+
+Validation: 27 non-MPI CTests passed; two Python runner tests passed; new
+arbitrary-tensor rotation regression passed; changed-state tail regression
+passed for both gap and Fermi-liquid field. Two-rank/two-update smoke run
+260922-203734-evolving-tail-smoke-radial-reference completed with exit 0 and
+normalization error 1.33e-15. An earlier tiny run required convergence and
+exited nonzero at the iteration limit; it successfully exercised plot recovery
+without masking the error. No long production calculation was launched.
+
+## 2026-09-22 - Fresh historical A-phase overnight configuration
+
+Exposed the existing shared historical nop/aop/dop initializer in the
+axisymmetric benchmark, using the temperature from its energy quadrature.
+Core selection affects only the seed, not the transport or asymptotic code.
+Historical seeds reject simultaneous restart/perturbation and unsupported
+off-center/non-unit winding settings. Added examples/2d_a_phase_fresh_overnight.nml
+and docs/A_PHASE_FRESH_OVERNIGHT.md. Compared the configuration with run
+260922-204123: only label, initialization, cleared restart, and maximum
+iterations (50) changed; physical and numerical settings are preserved.
+
+Rebuilt successfully; three focused Fortran tests and two Python runner tests
+passed. Two-rank/two-update fresh-aop smoke run 260922-213004 completed with
+exit 0 and maximum normalization error 1.35e-15. This tiny smoke run tests
+execution, not physical convergence. Production overnight run left to user.
+
+## 2026-09-22 - Fourth initialization: quadrupole core
+
+Read JLTP_quad_vortex.pdf pp. 3-5 and visually inspected Fig. 1. Added qop
+to the shared seed generator and historical_qop to both Fortran drivers
+and Python runners. This new initializer (not a historical code transcription)
+sets non-winding C_0-=sqrt(2)*Delta*f and C_-0=-C_0-, with the opposite pair
+zero initially. The existing A-phase radial envelope f=tanh(s)/s is used,
+with its analytic center limit. Bulk diagonal winding and zero initial
+mean field are preserved. No components are constrained during relaxation;
+the common state-dependent asymptotics and full 2D transport are unchanged.
+
+Added examples/2d_quadrupole_fresh.nml and docs/QUADRUPOLE_INITIALIZATION.md.
+The example retains current T=0.30, F1s=5.4 exploration settings, not the
+paper figure's T=0.60, F1s=6.0. Built separately in work/quadrupole-seed-build
+to avoid touching the overnight executable. All 27 non-MPI tests passed,
+including harmonic checks at every test-grid point for qop and unchanged
+legacy seeds. Python compilation and whitespace checks passed. No quadrupole
+MPI relaxation launched; metastability and final fourfold shape are untested.
+
+## 2026-09-23 - Clean radial Makefile linking and local workspace allocation
+
+new_src/Makefile now uses project-local linker defaults rather than inheriting
+unrelated shell LDFLAGS/LDLIBS. Explicit make-command overrides and EXTRA_*
+remain available. The executable depends on the Makefile and receives Fortran
+flags at link time. No OpenBLAS dependency is required by this target.
+Changed getnewop's sem workspace to a local allocatable with the same
+(4,-mx:mx) bounds, avoiding implicit static storage; removed a duplicate USE.
+Preserved the user's interpol.f90 correction. Rebuilt all radial objects and
+qcv with make -j10 while deliberately supplying the obsolete OpenBLAS path
+in the environment: build succeeded without either reported warning.
+No numerical run or input/output data changes were made.
+
+## 2026-09-23 - Updated radial versus overnight 2D comparison
+
+Archived current new_src op_xyz, curr, qcv.inp, quadrature tables and
+interpol.f90 under runs/260922-213118-a-phase-fresh-overnight-historical-aop/
+comparison-updated-radial-260923. T=0.30, F1s=5.4 and unit winding match;
+quadrature tables are byte-identical to the old reference tables.
+Added solver-free tools/embed_radial_reference.f90 to use the production
+radial reader, full tensor embedding and actual template grid, not an
+independent Python interpolation. Added separate-output and comparison-only
+options to plotting, and area-weighted comparison metrics.
+
+Updated reference versus unchanged 50-update final 2D state: gap relative L2
+0.00727571571845 (formerly 0.129107831567); mean-field relative L2
+0.00636909971932 (formerly 0.0377837235871), over active r<=16.
+Visually checked both full-axis component overlays: the previous sign
+discrepancy is absent. Remaining discrepancies require resolution/boundary
+and iteration-convergence checks; no claim of continuum convergence.
+Previous references, run metrics, and plots were preserved. New plots and
+comparison JSON are in the archived comparison subdirectory. No solver run.
+
+## 2026-09-23 - Preserved-core sparse outer extension
+
+Added common make_extended_smooth_cartesian_mesh and extended_smooth driver
+configuration, preserving original core coordinates exactly. Added restart_core
+for exact point transfer inside a configurable radius; outer active points
+start from corrected radial data and then evolve freely. Reference-map corners
+beyond radial support use a radial tail for display; active reference comparisons
+remain inside source support in the supplied test. Added internal prepare_only
+mode for inexpensive full-grid transfer validation and metrics for copied points.
+
+Prepared examples/2d_a_phase_extended_outer.nml and docs/EXTENDED_OUTER_GRID.md:
+core coordinate block [-20,20] unchanged; outer half-width 60, active radius 58,
+fit radii 40 and 52, trajectory outer radius 100; five updates. The grid has
+7921 points, 7453 active, versus 3065 previously active. This is a rectilinear
+outer-band extension, not a true polar annular mesh. Cost grows with point
+count and path length; no near-constant runtime claim is made.
+
+Preparation-only MPI execution succeeded. Independent array comparison found
+zero change at all 3065 copied core points. Angular sampling of matching-circle
+bilinear stencils gave maximum node radius 57.1942 < active radius 58.
+All 27 non-MPI CTests and two Python runner tests passed. No expensive full
+extended-domain map or production relaxation was launched.
+
+## 2026-09-23 — Plot an in-progress extended-domain checkpoint
+
+Added tools/plot_running_axisymmetric.py to snapshot an axisymmetric run and
+reuse the full existing plot suite without MPI or solver changes. Unique dated
+inspection directories preserve previous plots; stable reads, checkpoint grid
+validation and iteration filtering prevent mixing later history with an older
+checkpoint. Explicit checkpoint labels were added to radial comparison plots.
+Documented usage and pre-update residual versus post-update checkpoint semantics
+in docs/PLOTTING_RUNNING_BENCHMARK.md. Tested on saved update 2 of the extended
+A-phase run; original solver-owned files are only read.
+
+## 2026-09-23 — Compact quadrupole test at T/Tc=0.30, F1s=0
+
+Added examples/2d_quadrupole_Fs1_0.nml: full 2D historical_qop seed,
+zero Fermi-liquid feedback, active r=20, smooth 65x65 grid half-width22,
+fit radii14/17, trajectory endpoint70 and step0.25, 50 updates/checkpoint1.
+One-rank preparation-only run exited cleanly and counted 3481 active points.
+No production iteration launched. Documented that the driver's required
+A-phase/F1s5.4 reference is not a quadrupole or matching-parameter benchmark.
+Source inspection confirms endpoint radius100 in the extended A-phase run:
+projected chord 2 sqrt(R^2-b^2), physical length divided by sin(theta).
+
+## 2026-09-23 — Quadrupole live-checkpoint inspection
+
+Extended plot_running_axisymmetric.py with --latest NAME selection and
+--no-radial-comparison for independent core exploration. The latter produces
+field/harmonic, axis, convergence and residual plots without misleading
+A-phase overlays. Clear missing-run/checkpoint messages, dated snapshots,
+and read-only access to solver outputs are retained. Documented the command
+in QUADRUPOLE_INITIALIZATION.md; exercised field-only plotting on the existing
+extended A-phase checkpoint because no quadrupole run exists yet.
+
+## 2026-09-23 — FermiForge technical note revision 0.2
+
+Updated the LaTeX implementation note and canonical output/pdf artifact.
+Replaced obsolete Q1-only and three-band-only descriptions with the actual
+blended-quadratic trajectory sampler (up to 16 nodes), smooth sinh grid and
+core-preserving geometric outer bands. Explicitly retained the distinction
+between quadratic ray sampling, bilinear asymptotic-fit sampling and linear
+RK-stage coefficient interpolation. Added endpoint path length/cost and the
+corrected radial inverse-transform provenance.
+
+New reproducible figures show reduced actual grid constructions and signed
+components of the four exact seed formulas; the older asymptotic schematic
+remains separate. Added core_initialization.tex and standalone_run_guide.tex,
+including the runnable quadrupole input verbatim, file formats, temperature
+and transformed Fermi-liquid controls, CLI naming-versus-seed distinction,
+manual/Python launches, live plotting, restart and current limitations.
+The required A-phase reference is clearly not a quadrupole accuracy oracle.
+
+Validation: three existing mesh/seed/basis CTests passed; LaTeX compiled
+without overfull boxes, undefined references or float warnings; all 32 pages
+rendered and reviewed, with enlarged checks of figures and input tables.
+No solver source, production input or running calculation changed.
+
+## 2026-09-24 — Four compact single-harmonic seed tests
+
+Added localized_0plus, localized_plus0, localized_0minus and localized_minus0
+to the circular-mask full 2D driver and Python runner. A shared initializer
+retains the historical normal seed's unit-winding B background, adds only the
+selected real harmonic with compact C1 envelope (1-r^2/R_seed^2)^2 inside
+R_seed (default5), and starts all current-related fields at zero. Amplitude
+defaults to one bulk gap. These controls are recorded in solver metrics.
+Old historical_qop is retained unchanged for reproducibility, with a prominent
+documentation pointer to the preferred localized tests. No angular projection
+or change to the 1/r mixed-component asymptotic continuation was introduced.
+
+Four matched T0.30/Fs1=0 examples use the existing compact r20 domain, fit14/17,
+trajectory endpoint70, 50 updates and checkpoint1. Built separately under
+work/localized-seed-build. Added Fortran all-node harmonic/envelope/support/
+background tests and Python option-parser coverage. Four two-rank preparation
+runs exited cleanly; independent inspection of their full written maps confirms
+only the requested mixed harmonic, zero outer seed/halo mixed components and
+zero initial current fields. 27 tests passed in the restricted initial CTest
+run; its two MPI socket-blocked smoke tests passed on rerun with MPI access.
+All three Python runner tests passed. No production relaxation was launched;
+no changes were made to the completed overnight run.
+
+## 2026-09-24 — Harmonic checkpoint axis profiles
+
+Added --basis harmonic to the existing axis-profile plotter using the shared
+Cartesian-to-harmonic transform, retaining local complex phases and the same
+bulk normalization/layout as Cartesian profiles. The running-checkpoint tool
+now always writes harmonic_axis_profiles.png in either comparison mode.
+Two new tests check single-harmonic selection, Cartesian compatibility and
+retention of the B-background phase between x and y. Both passed. Generated
+and visually checked the full inspection for update12 of the running 0minus
+test without modifying any solver-owned data or interrupting the calculation.
+
+## 2026-10-06 — Integrate Linux cylinder work on the Mac
+
+Fetched GitHub main and fast-forwarded from 69e2431 to b33025b (modern radial
+specular-cylinder trajectories). Before integration, saved tracked and untracked
+Mac work in the retained safety stash
+`e1de0aa54133653b029ff7e30bd0f58ee7432b18`; reapplied it without dropping the
+checkpoint. Resolved the work-log conflict by retaining both histories.
+Existing ignored runs and builds were left in place. No commit or push was made.
+
+Reconciled radial input reading and runner metadata: legacy free-vortex inputs
+(9/10 records), explicit-grid free inputs (11/12), and cylinder inputs with a
+required final radius (11/13) are accepted. Preserved the Mac harmonic-sign
+correction, allocated trajectory workspace, build flags, and current qcv.inp.
+Documented formats in RUNNING_RADIAL_SPECULAR_CYLINDER.md and added parser tests.
+
+Verification: clean CMake build in work/mac-linux-integration-build; all 44 CTest
+tests passed, including 1/4/10-rank MPI checks. Isolated new_src Makefile build
+passed in work/mac-linux-radial-build/new_src. All 13 axisymmetric runner tests
+passed. Input-format tests passed for six valid layouts and invalid cases.
+Cylinder trajectory comparisons matched the legacy implementation; cylinder
+sampling/map tests passed at radii 4 and 6, with byte-identical maps from legacy
+and explicit-grid inputs and rejection of incompatible restarts/radii.
+
+The MPI-linked standalone cylinder probe SIGILLed on this Mac with GNU floating
+point traps enabled and passed without them. Its test script now omits those
+traps only for the MPI-linked probe on macOS, retaining bounds checks and explicit
+finite-value assertions; the non-MPI sampler retains traps. This isolates a test
+configuration incompatibility, not a demonstrated solver-physics failure; the
+precise runtime cause remains unproven. No production relaxation was launched.
+
+## 2026-10-06 — Radius-10 cylinder without a vortex
+
+Prepared three isolated radial cylinder cases: short execution smoke, 32-azimuth
+relaxation, and otherwise identical 48-azimuth comparison. All use T/Tc=0.30,
+F1s=0, zero winding and istart=-1 (uniform bulk B), with a specular wall at
+R=10 in existing solver coordinates. The conversion to a physical coherence
+length remains explicitly unverified. Added run_cylinder_R10_no_vortex.sh and
+usage/interpretation notes to RUNNING_RADIAL_SPECULAR_CYLINDER.md. Production
+cases allow 200 AA updates, p_max=3 and tolerance 2e-6 after legacy NN startup.
+No solver equations or reference input files were changed.
+
+Ran the smoke case on 10 MPI ranks in
+runs/20261006-181603-cylinder-R10-n0-T030-Fs0-smoke. Five NN updates plus one
+AA update completed with zero exit status and empty stderr. All output fields
+were finite on 100 radial points spanning 0..10; Python/Matplotlib generated
+Cartesian, harmonic, field, convergence and summary plots. Inspected summary:
+the wall-normal component is suppressed at the wall and the centre is regular.
+This two-azimuth, six-update check is not a converged or quadrature-validated
+physical solution. Approximately 0.8 seconds per smoke update was reported;
+the 32/48-azimuth runs remain for the user. Input metadata checks, shell syntax
+and git diff whitespace checks passed. Existing run/reference data preserved.
+
+## 2026-10-06 — Confirmed length convention
+
+Mikael confirmed that all length units are the zero-temperature coherence
+length xi_0. This resolves the uncertainty recorded above: the prepared R=10
+cylinder is exactly 10 xi_0, with spacing (10/99) xi_0 and reflected half-path
+length (8000/99) xi_0. Updated cylinder documentation and input comments.
+No numerical values, solver arithmetic, or existing run files were changed;
+no rerun is required for this clarification.
+
+## 2026-10-06 — Modern radial-symmetry cylinder transport
+
+Added explicit specular-cylinder geometry and reflected position/momentum paths
+to the modern serial point-map, inherited by its MPI layer. The default free
+geometry is unchanged. Cylinder sampling currently requires an independent
+radial state and rejects asymptotic endpoints or unsupported Cartesian wall
+sampling. Thus this is the radial-symmetry stage of the 2D-framework extension,
+not yet an unconstrained confined 2D solver.
+
+Uniform-step comparison mode retains the first incoming wall-sample convention;
+collision-aligned mode inserts both limits at each reflection. Riccati paths
+now allow equal coordinates to carry continuous coherence over a zero-distance
+coefficient jump. No integration interval in aligned mode straddles a reflection.
+Axial momentum is conserved, axial rays need no epsilon tilt, and exact wall
+targets use the legacy small interior displacement. Finite reflected half-path
+and endpoint initialization remain explicit convergence parameters.
+
+Added benchmark_radial_cylinder_2d (modern MPI map plus existing Anderson),
+an example namelist and tools/run_modern_cylinder.py. The runner archives inputs,
+executable and logs; offers single maps, AA updates, imported new_src profiles,
+collision alignment, step/length controls, and live/final Python plots.
+Absolute max residual is the stopping metric, not the scaled legacy max.
+The final saved field is always evaluated. No production relaxation or push.
+
+Verification: 45/45 main CTest tests passed including free-system/MPI regression.
+New geometric tests passed with bounds checks. Independent new_src comparisons
+use 100 nodes, two azimuths, 11 polar nodes and one pole: R=10 uniform bulk seed
+gap difference 2.24e-12; nonuniform quadratic profile with F1s=5.4 difference
+1.83e-12, current-field differences below 4e-18. Debug/bounds builds remain below
+7e-11. At R=4, uniform-grid centre collisions retain a side/rounding sensitivity
+(1.62e-6 release, 4.12e-8 debug); noncentral differences stay below 3e-12. This
+is documented explicitly and not claimed as bitwise agreement. One- versus
+ten-rank collision-aligned maps agreed within 1e-13.
+
+Ten-rank collision-aligned smoke with full eight-pole table and two azimuths:
+runs/261006-184802-849119-modern-cylinder-R10-n0. Two AA updates reduced absolute
+maximum residual from 0.279946 to 0.0430314; normalization error below 9e-16,
+empty MPI log, three successful map evaluations. Profile and harmonic plots
+generated and inspected. This is not a converged physical benchmark. Next:
+converged radial profile and step/length studies, then interior-only 2D wall
+stencils before releasing the radial constraint.
+
+## 2026-10-06 — No-vortex bulk A/B cylinder choices
+
+Added initialization=-1 (B, default) and -2 (chiral A) to the modern cylinder
+namelist and --initialization to its Python runner. Both require zero physical
+winding. Preserved new_src's seed matrices/amplitude scale: Delta I for B;
+A_zx=sqrt(2) Delta and A_zy=i sqrt(2) Delta for A. The initial amplitude is a
+guess, not a calculated equilibrium A gap. No change to legacy new_src.
+
+Separated physical winding from the radial harmonic symmetry label: B uses
+m=0, while uniform C_(0,+) A uses m=1 in exp[i(m-s-k)phi]. This avoids inserting
+a spurious angular phase or removing A at the centre. Imported A profiles
+must also select -2. Tests verify Cartesian constancy around a full circle,
+chirality and origin regularity for both seeds. Run directories carry the
+phase label and plots include the current-related field.
+
+46/46 CTest tests passed. A 10-rank, four-azimuth, eight-pole collision-aligned
+smoke with one AA update completed cleanly in
+runs/261006-191513-328870-modern-cylinder-R10-n0-bulk-a. Its map developed an
+azimuthal current-related field (maximum magnitude 0.13655 at r=10), while the
+centre value was below 5e-19. MPI stderr was empty. This tests functionality,
+not converged equilibrium or calibrated mass-current density. Documentation
+and example input updated; no production relaxation or Git push performed.
+
+## 2026-10-06 — Cylinder runner tool discovery
+
+Fixed startup FileNotFoundError for cmake when /opt/local/bin is absent from
+the interactive PATH. The runner now uses existing find_program discovery for
+CMake and mpirun, with common Mac installation fallbacks, and passes an augmented
+child-process PATH to configuration, compilation and MPI launch. User PATH
+precedence is retained; no shell startup files or system installation changed.
+Missing tools produce an actionable argument error rather than a Python traceback.
+Three runner unit tests passed. A clean build, two-rank single-map run and PNG
+generation passed with PATH restricted to /usr/bin:/bin (Python invoked by its
+absolute Homebrew path), in runs/261006-191738-157387-modern-cylinder-R10-n0-bulk-b.
+No production calculation was launched.
+
+## 2026-10-06 — Hands-on framework documentation
+
+## 2026-10-07 — Symmetry-reconstructed cylinder disk plots
+
+## 2026-10-07 — Matched R20 normal-core launch preparation
+
+## 2026-10-07 — GitHub development handoff
+
+Prepared an explicit source/documentation staging set for the Linux handoff,
+excluding private papers/application documents, local run data, raw benchmark
+archives and build products. Included maintained examples, reference-solver
+changes, modern sources, tests, plotting/launch tools and technical-note figures.
+Full modern build passed; 41 non-MPI CTests passed in the sandbox and all five
+MPI checks passed with approved socket access (46/46 overall). Python discovery
+passed 30 tests. Staged whitespace, size and credential-pattern checks passed.
+Fetched origin/main and confirmed no divergence before the commit. No history
+rewriting is intended; local excluded files are preserved.
+
+Added initialization=0/unit winding to the cylinder driver using the existing
+historical nop seed. Runner names/metadata distinguish normal-core from A-core.
+tools/run_cylinder_R20_normal_core.sh matches the A-core run at T=.30,
+Fs1=5.4, R=20, 201 nodes, step .1, half-path 160, 32 azimuths, 10 ranks,
+AA pmax3, 300-update ceiling and absolute tolerance2e-7. Only seed changes.
+No additional normal-branch constraint is imposed. Added centre-zero and unit
+winding seed tests. Production run is left for the user; none launched here.
+
+Added tools/plot_cylinder_disk.py and interpolation/phase/vector/mask tests.
+Generated seven PNGs in plots/disk for the completed
+261006-200527-645227-modern-cylinder-R20-n1-a-core-Fs5.4 run (173 updates,
+final maximum residual 1.4920e-7). Uses the archived radial fields, the solver's
+blended quadratic sampling and harmonic-equivalent tensor rotation; outside
+the disk is masked. Cartesian/harmonic amplitudes share a scale within each
+figure. Current plots remain labelled current-related mean fields. Inspected
+amplitude and density/current output visually. No new solve or data alteration.
+
+LaTeX follow-up: added standalone
+docs/technical_note/fermiforge_framework_guide.tex with an embedded TikZ
+flowchart, source map, diagnostic equations, practical commands and a revision
+record. Revision/date macros and an explicit maintenance section support later
+updates. Linked the companion Markdown guide and technical-note index. No
+solver code or running calculation changed.
+
+Added docs/FRAMEWORK_GUIDE.md as a dated navigation and practical introduction:
+algorithm flow, driver capability matrix, source map, state/MPI representation,
+grid/trajectory/exterior distinctions, input controls, short learning exercises,
+diagnostic interpretation and development boundaries. Corrected the README's
+obsolete assertion that modern benchmarks only perform one map. Existing
+technical notes remain linked; this does not claim those PDFs were rebuilt.
+Verified guide links/source paths and runner help commands, and checked patch
+whitespace. Documentation only: no solver run, physics change or Git push.
+
+## 2026-10-06 — Prepared R20 A-core vortex for user execution
+
+Extended the modern radial cylinder driver with initialization=1, winding=1,
+using the existing historical aop seed, radial symmetry reconstruction and
+origin projection. Bulk -1/-2 zero-winding options remain. Added --fs1 to the
+runner; the Fortran feedback conversion remains F1s/(1+F1s/3). No exterior
+asymptotic extrapolation is used in the cylinder. Added
+tools/run_cylinder_R20_a_core.sh: T=.30, F1s=5.4, R=20 xi_0, 201 nodes,
+step .1, reflected half-path 160, 32 azimuths, 11 polar nodes, all eight poles,
+10 ranks, up to 300 AA updates at p_max=3, maximum absolute tolerance 2e-7.
+The user will launch the production run; it has NOT been started here.
+
+Build, six runner tests, shell syntax and extended seed test passed. An
+intentionally coarse smoke (step .5, 11 nodes) failed its map and was not
+accepted. A repeat at the proposed spatial/path settings, but only two azimuths
+and one update, completed on ten ranks in
+runs/261006-200436-769931-modern-cylinder-R20-n1-a-core-Fs5.4.
+Its residual maximum decreased from .20848 to .20693 with the first damped
+update. This validates execution, not convergence or discretization accuracy.
+An initial sandbox MPI socket denial also produced a failed archive; the
+successful repeat used approved local MPI access. This remains an axisymmetric
+vortex calculation, unable to split into a double core.
+
+## 2026-10-06 — Tight B-cylinder continuation and Sauls reference
+
+Added --tolerance and modern-final-profile restart discovery to
+tools/run_modern_cylinder.py, retaining support for legacy op_xyz/curr imports.
+Restarts archive their source paths and start fresh Anderson history; parent
+outputs are preserved. All six runner unit tests passed. Added
+tools/compare_cylinder_profiles.py for same-grid complex-profile comparisons
+and a six-panel PNG; accounts for rounded legacy radial coordinates by comparing
+common node indices. No solver equations changed.
+
+Continued runs/261006-191812-464630-modern-cylinder-R10-n0-bulk-b in
+runs/261006-192650-696944-modern-cylinder-R10-n0-bulk-b with absolute maximum
+tolerance 4e-9 and at most 50 updates. Retained R=10 xi_0, T/Tc=.30, Fs1=0,
+100 radial nodes, 32 azimuths, 11 polar nodes, 8 poles, uniform collision
+sampling, original step/path lengths, p_max=3 and 10 MPI ranks. Converged in
+12 additional AA updates (13 evaluations), cumulative map time 176.512 s.
+Final residual RMS 2.8130e-10, maximum 2.8128e-9, relative L2 2.7416e-9;
+maximum normalization error over continuation 9.9921e-16. Clean process exit,
+empty mpi.log; standard plots produced.
+
+Compared with runs/20261006-183522-cylinder-R10-n0-T030-Fs0-relax:
+relative L2 gap difference decreased from 3.04544e-5 to 5.40242e-6;
+maximum complex-component difference decreased from 2.11506e-5 to 1.09523e-5.
+Remaining maximum is A_yy at r=9.79798 xi_0, near the wall. Comparison PNG
+visually checked and JSON saved under the continuation's comparison directory.
+The remaining discrepancy exceeds the iteration residual and should be tested
+under spatial/transport refinement; interpolation differences are a candidate,
+not an established diagnosis. The comparison is still radial-symmetry constrained.
+
+Read Sauls, PRB 84, 214509 (2011), including surface propagators, continuum
+edge-current contribution and temperature dependence. Added applicability notes
+to docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md: main thin-film/2D-Fermi-surface
+analytic results are not directly quantitative for our 3D-momentum cylinder;
+bound-state current alone does not equal total current. Physical mass-current
+normalization must be established before angular-momentum benchmarking. No
+new A-phase production run or Git push performed.

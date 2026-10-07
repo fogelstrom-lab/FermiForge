@@ -146,7 +146,7 @@ contains
     complex(rk) :: phased_harmonic(3, 3)
 
     call phase_axial_harmonics(radial_harmonic, angle, winding, phased_harmonic)
-    call axial_harmonics_to_transport_cartesian(phased_harmonic, cartesian)
+    call axial_harmonics_to_cartesian(phased_harmonic, cartesian)
   end subroutine reconstruct_axial_cartesian
 
 end module order_parameter_basis

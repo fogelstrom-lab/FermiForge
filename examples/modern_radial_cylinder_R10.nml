@@ -1,0 +1,18 @@
+&radial_cylinder
+ radius=10.0
+ radial_points=100
+ temperature=0.30
+ fs1=0.0
+ winding=0.0
+ initialization=-1 ! -1: bulk B, -2: chiral bulk A; both no physical winding
+ azimuths=32
+ maximum_step=0.10101010101010101
+ half_length=80.8080808080808
+ boundary_relaxation_distance=1.0101010101010101
+ collision_aligned=.false. ! first compare the uniform-step legacy transport
+ max_iterations=0 ! single self-consistency map before a relaxation
+ p_max=3.0
+ tolerance=2.e-6
+ gauss_file='new_src/gauss11.dat'
+ ozaki_file='new_src/ozaki_T=0.3.dat'
+/

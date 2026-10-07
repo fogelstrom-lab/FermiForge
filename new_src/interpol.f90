@@ -303,7 +303,8 @@ contains
       endif
 
       ses(1)=  0.5*(imp+ipm+imm+ipp)
-      ses(2)=w*0.5*(imm-ipp+imp-ipm)
+      ses(2)=w*0.5*(ipp-imm+imp-ipm)
+!     ses(2)=w*0.5*(imm-ipp+imp-ipm)
       ses(3)=  (imo+ipo)*sqrth
 
       ses(4)=w*0.5*(ipp-imm-imp+ipm)

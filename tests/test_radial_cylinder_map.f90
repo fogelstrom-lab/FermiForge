@@ -18,6 +18,16 @@ program test_radial_cylinder_map
     Ncmax=1
   end if
   call input_bcast
+  ! Full-precision initial fields for an independent modern-stack map check.
+  if(myid==0) then
+    open(81,file='initial_op_xyz',status='replace')
+    open(82,file='initial_curr',status='replace')
+    do i=0,nx
+      write(81,'(19es26.17e3)') xgrid(i),dxx(i),dxy(i),dxz(i),dyx(i),dyy(i),dyz(i),dzx(i),dzy(i),dzz(i)
+      write(82,'(5es26.17e3)') xgrid(i),0.0,real(vx(i)),real(vy(i)),real(vz(i))
+    end do
+    close(81); close(82)
+  end if
   if (.not. cyl) error stop 'Cylinder switch was not enabled'
   if (abs(xgrid(nx)-Rx)>1.0e-12) error stop 'Grid does not end at cylinder wall'
   do i=0,nx

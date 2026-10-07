@@ -3,7 +3,7 @@ module straight_trajectory_2d
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
   use spinful_state_2d, only : spinful_state_2d_t
   use bilinear_field_sampler_2d, only : bilinear_stencil_2d_t, &
-                                        make_bilinear_stencil_2d, &
+                                        make_bilinear_stencil_2d, make_quadratic_stencil_2d, &
                                         sample_pair_potential_stencil_2d
   implicit none
   private
@@ -49,6 +49,8 @@ contains
       error stop "trajectory momentum direction must have unit norm"
 
     call make_bilinear_stencil_2d(mesh, origin(1), origin(2), origin_stencil)
+    if (mesh%trajectory_interpolation_order == 2) &
+      call make_quadratic_stencil_2d(mesh, origin(1), origin(2), origin_stencil)
     if (.not. origin_stencil%inside) &
       error stop "trajectory origin lies outside the Cartesian mesh"
 
@@ -112,6 +114,9 @@ contains
       position = origin + trajectory%path_coordinate(index) * momentum(1:2)
       call make_bilinear_stencil_2d(mesh, position(1), position(2), &
                                     trajectory%stencil(index))
+      if (mesh%trajectory_interpolation_order == 2) &
+        call make_quadratic_stencil_2d(mesh, position(1), position(2), &
+                                       trajectory%stencil(index))
       if (.not. trajectory%stencil(index)%inside) &
         error stop "round-off moved a trajectory sample outside the mesh"
     end do

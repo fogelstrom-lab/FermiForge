@@ -24,8 +24,11 @@ DEBUG_FFLAGS = -O0 -g -fcheck=all -fbacktrace \
 	-ffpe-trap=invalid,zero,overflow -finit-real=snan
 
 FFLAGS = $(COMMON_FFLAGS) $(RELEASE_FFLAGS) $(EXTRA_FFLAGS)
-LDFLAGS += $(EXTRA_LDFLAGS)
-LDLIBS  += $(EXTRA_LDLIBS)
+# MPI supplies the libraries needed here; this solver does not use OpenBLAS.
+# Ignore unrelated shell linker settings, such as obsolete Homebrew paths.
+# Explicit make LDFLAGS="..." / LDLIBS="..." still override these defaults.
+LDFLAGS = $(EXTRA_LDFLAGS)
+LDLIBS  = $(EXTRA_LDLIBS)
 
 OBJ = he3_kinds.o legacy_anderson_mixing.o global_dec.o bulkgap.o \
 	init_calc.o mpicalls.o trajectories.o interpol.o riccati.o getnewses.o packses.o \
@@ -35,8 +38,8 @@ OBJ = he3_kinds.o legacy_anderson_mixing.o global_dec.o bulkgap.o \
 
 all: $(EXEC)
 
-$(EXEC): $(OBJ)
-	$(MPIFC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
+$(EXEC): $(OBJ) Makefile
+	$(MPIFC) $(FFLAGS) $(LDFLAGS) -o $@ $(OBJ) $(LDLIBS)
 
 %.o: %.f90 Makefile
 	$(MPIFC) $(FFLAGS) -c $< -o $@

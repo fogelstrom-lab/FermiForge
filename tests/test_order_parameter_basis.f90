@@ -14,10 +14,37 @@ program test_order_parameter_basis
   call test_radial_transport_projection()
   call test_axial_phase_factors()
   call test_b_phase_far_field()
+  call test_general_rotation()
 
   print '(a)', "order-parameter basis tests passed"
 
 contains
+
+  subroutine test_general_rotation()
+    complex(rk) :: axis(3,3), harmonic(3,3), actual(3,3), expected(3,3)
+    real(rk) :: rotation(3,3), angle
+    integer :: i, j, k
+    do i=1,3
+      do j=1,3
+        axis(i,j)=cmplx(0.13_rk*i+0.07_rk*j,0.11_rk*i-0.19_rk*j,rk)
+      end do
+    end do
+    call cartesian_to_axial_harmonics(axis,harmonic)
+    do k=0,4
+      angle=0.37_rk*k
+      rotation=0.0_rk
+      rotation(1,1)=cos(angle)
+      rotation(2,2)=cos(angle)
+      rotation(1,2)=-sin(angle)
+      rotation(2,1)=sin(angle)
+      rotation(3,3)=1.0_rk
+      expected=exp(cmplx(0.0_rk,angle,rk))* &
+        matmul(rotation,matmul(axis,transpose(rotation)))
+      call reconstruct_axial_cartesian(harmonic,angle,1.0_rk,actual)
+      call require(maxval(abs(actual-expected)) < 1.e-13_rk, &
+        'general tensor embedding violates phase-wound rotation')
+    end do
+  end subroutine test_general_rotation
 
   subroutine test_cartesian_component_formulas()
     complex(rk) :: cartesian(3, 3), harmonic(3, 3)

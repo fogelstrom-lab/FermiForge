@@ -1,4 +1,6 @@
 program test_he3_field_map_2d
+  use barzilai_borwein_mixing, only: bb_mixing_t
+  use polyak_mixing, only: polyak_mixing_t
   use he3_kinds, only : rk
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t, &
                                 make_uniform_cartesian_mesh
@@ -96,6 +98,8 @@ contains
     type(cartesian_mesh_2d_t) :: mesh
     type(he3_field_residual_report_t) :: residual_report
     type(legacy_anderson_t) :: accelerator
+    type(bb_mixing_t) :: bb
+    type(polyak_mixing_t) :: polyak
     type(spinful_state_2d_t) :: current, expected, mapped, next
     logical, allocatable :: active_point(:)
     integer :: point
@@ -179,6 +183,55 @@ contains
                  maxval(abs(next%current_mean_field - &
                                 expected%current_mean_field)) < 2.0e-15_rk, &
       "masked Anderson update changed a frozen point")
+    mapped%current_mean_field(1,2) = current%current_mean_field(1,2) + 0.3_rk
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, active_point, simple_mixing=0.1_rk)
+    expected = current
+    expected%order_parameter(:,:,2) = current%order_parameter(:,:,2) + &
+      0.1_rk*(mapped%order_parameter(:,:,2)-current%order_parameter(:,:,2))
+    expected%current_mean_field(:,2) = current%current_mean_field(:,2) + &
+      0.1_rk*(mapped%current_mean_field(:,2)-current%current_mean_field(:,2))
+    call require(maxval(abs(next%order_parameter-expected%order_parameter)) < 2e-15_rk &
+      .and. maxval(abs(next%current_mean_field-expected%current_mean_field)) < 2e-15_rk, &
+      "simple update must mix both fields and preserve frozen points")
+    call require(accelerator%history_size() == 1 .and. anderson_report%history_size == 0, &
+      "simple update must not feed Anderson history")
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, current, 1e-10_rk, next, &
+      anderson_report, residual_report, active_point, simple_mixing=0.1_rk)
+    call require(anderson_report%converged, "simple update must recognize convergence")
+    call bb%initialize(new_src_masked_iteration_vector_size_2d(current,active_point), &
+      0.1_rk,0.001_rk,5.0_rk,2.0_rk,.false.)
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, active_point, bb=bb)
+    call require(maxval(abs(next%order_parameter-expected%order_parameter)) < 2e-15_rk &
+      .and. maxval(abs(next%current_mean_field-expected%current_mean_field)) < 2e-15_rk, &
+      "BB must mix both active fields and preserve frozen points")
+    call require(accelerator%history_size()==1,"BB must not change Anderson history")
+    call polyak%initialize(new_src_masked_iteration_vector_size_2d(current,active_point),0.1_rk,0.5_rk)
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, active_point, polyak=polyak)
+    call require(maxval(abs(next%order_parameter-expected%order_parameter)) < 2e-15_rk &
+      .and. maxval(abs(next%current_mean_field-expected%current_mean_field)) < 2e-15_rk, &
+      'Polyak must mix both active fields and preserve frozen points')
+    call require(accelerator%history_size()==1,'Polyak must not change Anderson history')
+    call polyak%initialize(new_src_iteration_vector_size_2d(current),0.1_rk,0.5_rk)
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, polyak=polyak)
+    call require(maxval(abs(next%order_parameter-current%order_parameter - &
+      0.1_rk*(mapped%order_parameter-current%order_parameter)))<2e-15_rk, &
+      'unmasked Polyak update')
+    call accelerator%reset()
+    call update_he3_state_with_anderson( &
+      mesh, accelerator, current, mapped, 0.0_rk, next, &
+      anderson_report, residual_report, active_point)
+    call require(anderson_report%iteration == 1 .and. anderson_report%history_size == 1 &
+      .and. abs(anderson_report%mixing-0.01_rk) < epsilon(1.0_rk), &
+      "restarted Anderson must begin with fresh history and initial damping")
   end subroutine test_residual_and_anderson_adapter
 
 

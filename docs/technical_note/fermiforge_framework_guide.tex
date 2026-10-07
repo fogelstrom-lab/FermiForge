@@ -1,0 +1,358 @@
+% Standalone living guide: no external figures or input files required.
+% Update the revision/date and revision record whenever capabilities change.
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=25mm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,longtable,array}
+\usepackage{xcolor,listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue!45!black,urlcolor=blue!45!black}
+\newcommand{\GuideVersion}{0.1}
+\newcommand{\GuideDate}{6 October 2026}
+\newcommand{\He}{\ensuremath{{}^{3}\mathrm{He}}}
+\newcommand{\file}[1]{\texttt{\detokenize{#1}}}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,columns=fullflexible,
+ keepspaces=true,frame=single,rulecolor=\color{black!20},
+ backgroundcolor=\color{black!2},showstringspaces=false}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\emergencystretch}{3em}
+\title{FermiForge\\\large A hands-on map of the framework}
+\author{Living project documentation}
+\date{Revision \GuideVersion\ --- \GuideDate}
+\begin{document}
+\maketitle
+\begin{abstract}
+This guide connects the physical calculation, software layers and day-to-day
+workflow of FermiForge. It distinguishes general two-dimensional free-vortex
+calculations from symmetry-constrained radial and cylinder modes, maps the
+source modules, and gives small practical exercises. It describes the
+implementation at the revision date, not a promise that every parameter
+regime or planned device geometry has been validated.
+\end{abstract}
+\tableofcontents
+\clearpage
+
+\section{Scope and present capabilities}
+The present solver is a spinful quasiclassical mean-field solver for \He.
+Fields depend on $x,y$ and are translation-invariant along $z$, but momentum
+retains three components. Spatially two-dimensional therefore does not mean
+a two-dimensional Fermi surface.
+
+The modern transport and self-consistency solver is Fortran. Python prepares,
+archives, diagnoses and plots runs. The separate \file{new_src} radial code is
+a numerical reference, not the engine underneath every modern run.
+At each independent point the state contains nine complex components
+$A_{\mu i}$ (spin index $\mu$, orbital index $i$) and three real current-related
+Fermi-liquid fields: 21 real iteration entries. Propagation retains spin
+structure. The current self-consistency law is the \He\ model; a general
+library of superconducting materials and interfaces remains a development goal.
+
+\begin{center}\small
+\begin{tabular}{p{.23\linewidth}p{.32\linewidth}p{.34\linewidth}}
+\toprule Calculation & Route & Constraint \\\midrule
+General 2D free vortex & Axisymmetric benchmark in \file{full_2d}, or double-core driver & No cylindrical field symmetry \\
+Radial free vortex & \file{radial_symmetry} mode & Independent positive-$x$ ray; angular reconstruction imposed \\
+Specular cylinder & Modern cylinder driver & Radial symmetry; reflected trajectories \\
+Legacy reference & \file{new_src} & Separate radial solver and conventions \\
+Manufactured demo & 2D demo & Prescribed fields; no self-consistency \\\bottomrule
+\end{tabular}\end{center}
+
+The name \file{benchmark_axisymmetric_core_2d} is historical: in
+\file{full_2d} mode it evolves an unconstrained planar field even when the
+initial state is axisymmetric. Conversely, plotting a radial solution over
+the plane does not make its calculation unconstrained 2D.
+
+\section{Algorithm and parallel execution}
+Figure~\ref{fig:flow} gives the functional sequence. Individual drivers differ:
+zero-mode projection and external probes belong to particular free-vortex
+workflows, while the cylinder has its own shorter iteration driver.
+
+MPI assigns whole target-point calculations to ranks. A rank handles that
+point's momentum directions and energy poles locally. Fields are replicated;
+this is not spatial domain decomposition with nearest-neighbour ghost exchange.
+The accelerator update is coordinated and the resulting state communicated.
+Memory, communication and unequal point costs can eventually limit scaling.
+
+\begin{figure}[p]
+\centering
+\begin{tikzpicture}[
+ node distance=6mm,
+ box/.style={draw=black!55,rounded corners,fill=blue!3,text width=11.7cm,
+ align=center,inner sep=7pt,font=\small},
+ arr/.style={-{Latex[length=2mm]},thick}]
+\node[box] (input) {Example namelist and explicit command-line overrides};
+\node[box,below=of input] (python) {Python runner\\Build; create a unique run directory; archive inputs and executable};
+\node[box,below=of python] (setup) {Fortran setup\\Physics, quadratures, grid, and initial or restarted fields};
+\node[box,below=of setup] (state) {Current state $X_k$\\Refresh dependent exterior fields where applicable};
+\node[box,below=of state] (mpi) {Distribute independent target points over MPI ranks};
+\node[box,below=of mpi] (map) {For each target, direction and energy pole:\\
+construct straight or reflected ray; sample mean fields;\\
+propagate Riccati amplitudes from both ends;\\
+reconstruct propagator and accumulate self-consistency};
+\node[box,below=of map] (res) {Collect $F(X_k)$; compute $R_k=F(X_k)-X_k$\\Diagnostics and checkpoints};
+\node[box,below=of res] (decision) {Stopping test\\Converged or work limit: save outputs and make plots};
+\node[box,below=of decision] (update) {Otherwise: accelerator update and constraints $\longrightarrow X_{k+1}$};
+\foreach \a/\b in {input/python,python/setup,setup/state,state/mpi,mpi/map,map/res,res/decision,decision/update}
+ \draw[arr] (\a)--(\b);
+\draw[arr] (update.west)--++(-.7,0)|-(state.west);
+\end{tikzpicture}
+\caption{Functional framework map. The loop returns to the current-state stage.
+The diagram summarizes the numerical workflow rather than an exact call graph.}
+\label{fig:flow}
+\end{figure}
+\clearpage
+
+\section{Source-code map}
+All paths are relative to the repository root. Read a driver first, then follow
+the particular layer you want to understand. Long filenames in the table may
+wrap; the repository spelling is unchanged.
+\begingroup\small
+\renewcommand{\arraystretch}{1.2}
+\begin{longtable}{p{.30\linewidth}p{.62\linewidth}}
+\toprule Layer & Source entry points \\\midrule\endfirsthead
+\toprule Layer & Source entry points (continued) \\\midrule\endhead
+Run preparation & \path{tools/run_axisymmetric_core_benchmark.py} \\
+Free-vortex orchestration & \path{app/benchmark_axisymmetric_core_2d.f90} \\
+Double-core orchestration & \path{app/benchmark_legacy_double_core_map_2d.f90}; \path{tools/run_double_core_from_scratch.py} \\
+Cylinder & \path{app/benchmark_radial_cylinder_2d.f90}; \path{tools/run_modern_cylinder.py} \\
+Mesh and indexing & \path{src/cartesian_mesh_2d.f90} \\
+State and radial reconstruction & \path{src/spinful_state_2d.f90} \\
+Cartesian sampling & \path{src/bilinear_field_sampler_2d.f90} (historical name) \\
+Basis and harmonics & \path{src/order_parameter_basis.f90} \\
+Core seeds & \path{src/historical_core_seed_2d.f90} \\
+MPI and serial map & \path{src/he3_mpi_field_map_2d.f90}; \path{src/he3_serial_point_map.f90} \\
+Straight and reflected rays & \path{src/straight_trajectory_2d.f90}; \path{src/specular_cylinder_2d.f90} \\
+Free-vortex exterior & \path{src/free_vortex_asymptotic_2d.f90} \\
+Riccati transport & \path{src/legacy_riccati_trajectory_2d.f90}; \path{src/riccati_segment.f90} \\
+Propagator and spin algebra & \path{src/quasiclassical_propagator.f90}; \path{src/spin_matrix_2x2.f90} \\
+Self-consistency integrand & \path{src/he3_self_consistency_integrand.f90} \\
+Quadratures and bulk gap & \path{src/he3_quadrature.f90}; \path{src/ozaki_generator.f90}; \path{src/he3_bulk_gap.f90} \\
+Packing and residuals & \path{src/new_src_iteration_layout_2d.f90}; \path{src/he3_nonlinear_iteration_2d.f90} \\
+Accelerators & \path{src/legacy_anderson_mixing.f90}; \path{src/barzilai_borwein_mixing.f90}; \path{src/polyak_mixing.f90} \\
+Regression coverage & \path{tests/}; registrations in \path{CMakeLists.txt} \\\bottomrule
+\end{longtable}\endgroup
+
+\file{examples/} contains inputs; \file{work/} contains builds and working
+products; \file{runs/} contains dated experiments; \file{benchmarks/} holds
+reference cases. Separately maintained \file{2D_benchmarks/} data may be
+absent from another checkout. Do not assume they were uploaded to GitHub.
+
+\section{Grid, trajectories and exterior fields}
+\subsection{Independent and dependent points}
+The full-2D field grid is tensor-product Cartesian. Uniform, piecewise
+multiscale and smoothly stretched choices exist in the appropriate drivers.
+The smooth option uses a hyperbolic-sine coordinate mapping, not an
+unstructured finite-element mesh or elliptical rings. Active masks and
+asymptotic fit surfaces need not coincide with the outer box.
+
+An \emph{active point} receives a self-consistency map and contributes to the
+iteration vector. A \emph{dependent halo point} supplies fields for sampling
+but may be filled from evolving asymptotics rather than independently relaxed.
+External probes test extrapolation; their role and whether they are iterated
+depend on the driver and input. They must not silently count as interior
+convergence points.
+
+\subsection{Free vortex versus physical wall}
+For a free vortex, the phase-wound bulk matrix $A_0$ is the asymptotic
+reference. Current-state fitting allows angle-dependent coefficients,
+including rotation-like order-parameter tails and inverse-radius mean-field
+terms. Reference-based endpoints also exist as comparison tools; they are
+not equivalent to \file{state_asymptotic}. The detailed implemented expressions
+belong in the mathematical note; this guide does not replace those equations.
+
+Trajectory sampling has its own step size, independent of field-node spacing.
+Fewer field points do not imply shorter trajectories. In radial mode,
+trajectory fields are interpolated directly from the ray, not the reconstructed
+Cartesian plotting grid.
+
+In a cylinder the wall is physical. Rays reflect specularly, remain inside
+the wall and use no free-vortex exterior fit. Reflected half-path length is
+propagation distance, not cylinder radius. Uniform collision sampling and
+collision-aligned sampling are available; finite-step answers need not coincide.
+
+\section{Input controls}
+\begin{description}
+\item[Physics.] Temperature is $T/T_c$. Free-vortex startup can generate poles
+and the bulk gap. The input \file{fs1} is the tabulated $F_1^s$, converted to
+the feedback parameter $F_1^s/(1+F_1^s/3)$.
+\item[Extent and resolution.] \file{half_width} controls physical extent;
+\file{number_of_cells} controls cells across an axis. There is one more node
+than cells. \file{active_radius} specifies the independent region or ray.
+\item[Node placement.] \file{mesh_kind} and \file{smooth_stretch} determine
+grading; equal point counts can have different core resolution.
+\item[Trajectory sampling.] \file{trajectory_interpolation_order} is field
+sampling order, not Riccati integration order. \file{trajectory_maximum_step}
+bounds a trajectory interval.
+\item[Exterior.] Fit, matching and outer radii control coefficient extraction
+and trajectory endpoints. They are not interchangeable.
+\item[Initialization.] \file{initialization_mode} selects the applicable
+reference, historical seed, localized harmonic or restart workflow.
+\item[Iteration.] The free-vortex benchmark offers \file{anderson},
+\file{bb} and \file{polyak}. \file{maximum_iterations} limits work;
+\file{convergence_tolerance} sets a stopping threshold.
+\end{description}
+
+For radial symmetry with even $N$ cells and active radius equal to half-width,
+there are $N/2+1$ independent ray nodes. Thus 118 cells gives 60 radial points.
+The cylinder takes \file{radial_points} explicitly instead.
+
+The cylinder convenience runner is narrower: temperature is fixed at 0.30
+with an archived Ozaki table; radius, \file{--fs1} and discretization are
+exposed. It uses Anderson with $p_{\max}=3$ and history length 10. Free-vortex
+flags do not automatically apply to it. The saved namelist is the authoritative
+record of what was launched.
+
+\section{A practical tour}
+Run from the project root (or the equivalent Linux checkout):
+\begin{lstlisting}
+cd /Users/mikael/Documents/Codex/3he-vortex-modernization
+\end{lstlisting}
+Dependencies are a Fortran compiler, MPI, CMake, LAPACK, and Python with
+NumPy/Matplotlib. Avoid simultaneous laptop MPI jobs. Asking a runner for
+\file{--help} does not start a calculation.
+
+\subsection{Plotting without a physical solve}
+\begin{lstlisting}
+python3 tools/run_2d_demo.py --case-name orientation-demo --formats png
+\end{lstlisting}
+Inspect the input and resulting plots. These are manufactured fields, not an
+equilibrium vortex: this exercise tests storage, interpolation and plotting.
+
+\subsection{Three radial updates through the physical solver}
+\begin{lstlisting}
+python3 tools/run_axisymmetric_core_benchmark.py \
+  --input examples/radial_bb_localized_0plus.nml \
+  --case-name orientation-radial \
+  --ranks 10 --max-iterations 3 --checkpoint-interval 1
+\end{lstlisting}
+This uses the compact 0plus scratch seed, $T/T_c=0.30$, $F_1^s=5.4$,
+60 independent radial points and BB. Three updates are a learning exercise,
+not a convergence test. Reference paths support comparison plots but do not
+initialize this seed. For a separate AA experiment add
+\file{--iteration-method anderson --anderson-pmax 3}; keep other settings fixed.
+
+\begin{lstlisting}
+python3 tools/plot_running_axisymmetric.py --latest orientation-radial
+\end{lstlisting}
+Read after a completed checkpoint; retry if a write is in progress. To restart,
+use \file{--restart PATH/TO/final_fields_2d.dat} with matching input and an
+explicit iteration limit. A field restart does not guarantee preservation of
+accelerator history. Preserve parent directories.
+
+\subsection{Approaching the full-2D branch}
+Compare \path{examples/2d_double_core_Fs1_zero_smooth.nml} with the radial
+input and read \path{docs/SMOOTH_GRID_TEST.md}. Inspect:
+\begin{lstlisting}
+python3 tools/run_double_core_from_scratch.py --help
+\end{lstlisting}
+This runner uses \file{--iterations}, unlike the axisymmetric runner's
+\file{--max-iterations}. Do not simply switch a 118-cell radial calculation
+to full 2D: the independent point count grows dramatically. Begin with a
+known small 2D case and one map or a few updates.
+
+\subsection{The prepared confined-vortex experiment}
+\begin{lstlisting}
+caffeinate -i bash tools/run_cylinder_R20_a_core.sh
+\end{lstlisting}
+On Linux omit \file{caffeinate}. This is a longer experiment: $R=20\xi_0$,
+$T/T_c=0.30$, $F_1^s=5.4$, 201 nodes, unit circulation, an A-phase-core seed
+in B phase, ten ranks and up to 300 Anderson updates. It cannot split into
+a double core because radial symmetry is imposed. In this driver,
+\file{initialization=1} means the A-phase-core vortex; \file{-2} means
+bulk chiral A without a vortex. For live inspection use:
+\begin{lstlisting}
+python3 tools/run_modern_cylinder.py --plot-only runs/YOUR_RUN_DIRECTORY
+\end{lstlisting}
+
+\section{Interpreting a run}
+\begin{enumerate}
+\item Check the saved input, restart source and executable provenance.
+\item Confirm temperature, $F_1^s$, independent point count and quadrature.
+\item Read terminal status: a single map or iteration limit is not convergence.
+\item Inspect RMS and maximum residuals, not only the applied update.
+\item Locate the residual: core motion, fit surfaces and grid transitions
+suggest different tests. A maximum hopping between equivalent cores may only
+reflect tie-breaking.
+\item Compare Cartesian and harmonic profiles, including imaginary components.
+\item Refine grid, trajectory step, quadrature and exterior treatment separately.
+\end{enumerate}
+
+For the packed independent state, write
+\begin{align}
+R_k&=F(X_k)-X_k,\\
+\epsilon_{\mathrm{RMS}}&=\sqrt{\frac{1}{N}\sum_{i=1}^N R_{k,i}^2},&
+\epsilon_{\max}&=\max_i|R_{k,i}|,\\
+\epsilon_{\mathrm{rel}}&=\frac{\lVert R_k\rVert_2}{\lVert X_k\rVert_2}.
+\end{align}
+Here $N$ counts real independent entries, not spatial points; zero-denominator
+safeguards are driver-specific. Gap and mean-field entries have no physical
+rescaling in these norms. Area-weighted and regional diagnostics are separate.
+Legacy scaled maxima cannot be directly compared with modern absolute maxima.
+An accelerated update is not the residual itself.
+
+Propagator normalization checks the algebraic quasiclassical identity. A
+machine-precision result does not bound spatial, energy, angular or endpoint
+error. Likewise, ``benchmark passed'' refers to the configured checks; verify
+convergence status and reference discrepancy independently.
+
+The stored current-related field is not automatically calibrated physical
+mass-current density. A gap-amplitude or pair-density plot is not a calculated
+superfluid-density tensor.
+
+Cylinder output uses \file{cylinder_*}; free-vortex workflows generally use
+\file{metrics.txt}, \file{iteration_history.dat},
+\file{final_fields_2d.dat}, checkpoints and residual snapshots. The cylinder
+evaluates its final saved state. Elsewhere check map/update indexing before
+attributing a residual to a post-update checkpoint; a separate zero-update
+map is the unambiguous verification.
+
+\section{Further reading and development boundaries}
+The following repository notes provide more detail:
+\begin{itemize}
+\item \path{docs/RADIAL_SYMMETRY.md}: radial physics, input and signed diagnostics.
+\item \path{docs/PLOTTING_RUNNING_BENCHMARK.md}: live plots.
+\item \path{docs/RUNNING_RADIAL_SPECULAR_CYLINDER.md}: cylinder options and checks.
+\item \path{docs/EVOLVING_ASYMPTOTIC_RESTART.md}: evolving exterior treatment.
+\item \path{docs/architecture/MATHEMATICAL_CONVENTIONS.md}: conventions.
+\item \path{docs/technical_note/fermiforge_algorithm_and_architecture.tex}:
+the mathematical implementation note.
+\item \path{docs/BB_ITERATION.md}, \path{docs/POLYAK_ITERATION.md},
+\path{docs/CYCLED_ITERATION.md}: accelerators.
+\item \path{docs/PROJECT_PLAN.md}, \path{docs/hpc/SCALING.md}: roadmap and scaling.
+\end{itemize}
+Older notes and PDFs may lag the code. We have radial/full-2D comparisons,
+converged vortex experiments and cylinder regression checks, not universal
+validation. Unrestricted 2D wall sampling, leads, spin-active interfaces,
+a DG backend, GPU execution and learned acceleration remain future work.
+Mesh utilities and staged domain studies are not universal automatic
+error-controlled refinement during every solve.
+
+Keep interpolation, propagator algebra, physical self-consistency, iteration
+and plotting separately testable. Begin changes with deterministic small tests,
+compare one and multiple MPI ranks, then use controlled physics benchmarks.
+Do not replace trusted reference data merely because a new solver's residual
+is small.
+
+\section{Maintaining this guide}
+This file is a self-contained, editable LaTeX source with an embedded vector
+flowchart. It needs no external figures or included project files. Use the
+native LaTeX editor for preview and compilation. It complements, rather than
+replaces, the detailed mathematical note.
+
+When a feature changes: update the capability table and corresponding source
+entry, verify example options against runner help, update the revision/date
+macros at the top, add a revision entry below, and record the change in
+\file{MODERNIZATION_LOG.md}. Recheck the PDF for table and diagram readability.
+Keep the Markdown navigation guide aligned; the two are not automatically
+synchronized. Do not change the documented validation status without evidence.
+
+\begin{center}\small
+\begin{tabular}{p{.12\linewidth}p{.20\linewidth}p{.56\linewidth}}
+\toprule Revision & Date & Changes \\\midrule
+0.1 & 6 October 2026 & Initial LaTeX edition of the hands-on framework guide;
+capabilities, algorithm, source map, exercises and maintenance procedure. \\\bottomrule
+\end{tabular}\end{center}
+\end{document}

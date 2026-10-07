@@ -1,5 +1,6 @@
 module historical_core_seed_2d
   use he3_kinds, only : rk
+  use order_parameter_basis, only : axial_harmonics_to_cartesian
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
   use spinful_state_2d, only : spinful_state_2d_t, &
     allocate_spinful_state_2d
@@ -14,8 +15,52 @@ module historical_core_seed_2d
   end type historical_core_seed_report_t
 
   public :: initialize_historical_core_seed_2d
+  public :: initialize_localized_harmonic_seed_2d
 
 contains
+
+  subroutine initialize_localized_harmonic_seed_2d( &
+      mesh, mode, bulk_gap, reduced_temperature, core_radius, amplitude, state)
+    use, intrinsic :: ieee_arithmetic, only : ieee_is_finite
+    type(cartesian_mesh_2d_t), intent(in) :: mesh
+    character(len=*), intent(in) :: mode
+    real(rk), intent(in) :: bulk_gap, reduced_temperature, core_radius, amplitude
+    type(spinful_state_2d_t), intent(out) :: state
+    complex(rk) :: harmonic(3,3), addition(3,3)
+    real(rk) :: coordinate(2), radius_squared, envelope
+    integer :: spin, orbital, point
+
+    if (.not. ieee_is_finite(core_radius) .or. .not. ieee_is_finite(amplitude)) &
+      error stop 'localized seed controls must be finite'
+    if (core_radius<=0.0_rk.or.amplitude<=0.0_rk) &
+      error stop 'localized seed radius and amplitude must be positive'
+    select case(trim(mode))
+    case('localized_0plus')
+      spin=2; orbital=1
+    case('localized_plus0')
+      spin=1; orbital=2
+    case('localized_0minus')
+      spin=2; orbital=3
+    case('localized_minus0')
+      spin=3; orbital=2
+    case default
+      error stop 'unknown localized harmonic seed'
+    end select
+    ! Preserve the phase-wound diagonal B background, but no historical tail.
+    call initialize_historical_core_seed_2d( &
+      mesh,'nop',bulk_gap,reduced_temperature,0.0_rk,state)
+    do point=1,mesh%point_count()
+      coordinate=mesh%point_coordinate(point)
+      radius_squared=sum(coordinate**2)
+      if(radius_squared>=core_radius**2) cycle
+      ! Compact C1 envelope: value and radial derivative vanish at the edge.
+      envelope=(1.0_rk-radius_squared/core_radius**2)**2
+      harmonic=cmplx(0.0_rk,0.0_rk,rk)
+      harmonic(spin,orbital)=cmplx(amplitude*bulk_gap*envelope,0.0_rk,rk)
+      call axial_harmonics_to_cartesian(harmonic,addition)
+      state%order_parameter(:,:,point)=state%order_parameter(:,:,point)+addition
+    end do
+  end subroutine initialize_localized_harmonic_seed_2d
 
   subroutine initialize_historical_core_seed_2d( &
       mesh, kind, bulk_gap, reduced_temperature, feedback_parameter, &
@@ -27,7 +72,7 @@ contains
     type(spinful_state_2d_t), intent(out) :: state
     type(historical_core_seed_report_t), intent(out), optional :: report
 
-    complex(rk) :: diagonal, vortex_phase
+    complex(rk) :: diagonal, vortex_phase, core_harmonic(3,3), core_cartesian(3,3)
     real(rk) :: angular_cosine, angular_sine, ar, core_fill
     real(rk) :: coordinate(2), core_length_scale, phase, radius, x, y
     integer :: point
@@ -38,8 +83,8 @@ contains
         reduced_temperature >= 1.0_rk) &
       error stop "invalid historical core seed gap or temperature"
     if (trim(kind) /= "nop" .and. trim(kind) /= "aop" .and. &
-        trim(kind) /= "dop") &
-      error stop "historical core seed kind must be nop, aop, or dop"
+        trim(kind) /= "dop" .and. trim(kind) /= "qop") &
+      error stop "core seed kind must be nop, aop, dop, or qop"
     if (trim(kind) == "dop" .and. 1.0_rk + feedback_parameter <= 0.0_rk) &
       error stop "historical dop seed has a nonpositive feedback scale"
 
@@ -73,6 +118,16 @@ contains
       if (trim(kind) == "nop") cycle
       core_fill = historical_core_fill(ar)
       select case (trim(kind))
+      case ("qop")
+        ! JLTP 116 (1999), Fig. 1: non-winding C_0- and C_-0.
+        ! Indices are (+,0,-). Do NOT apply the axisymmetric phase law:
+        ! it would attach exp(2 i phi) and remove the intended finite core.
+        ! This is a new seed, not a transcription of the historical aop.
+        core_harmonic = cmplx(0.0_rk,0.0_rk,rk)
+        core_harmonic(2,3) = sqrt(2.0_rk)*bulk_gap*core_fill
+        core_harmonic(3,2) = -core_harmonic(2,3)
+        call axial_harmonics_to_cartesian(core_harmonic,core_cartesian)
+        state%order_parameter(:,:,point) = state%order_parameter(:,:,point) + core_cartesian
       case ("aop")
         angular_cosine = cos(2.0_rk * phase)
         angular_sine = sin(2.0_rk * phase)

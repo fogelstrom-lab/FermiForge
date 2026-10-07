@@ -4,6 +4,73 @@ Module Initialisation
    use, intrinsic :: ieee_arithmetic, only : ieee_is_finite
    implicit none
 contains
+   subroutine read_radial_input(temp,tol,gridM)
+      ! One numeric value per record, with optional trailing comments.
+      ! Legacy: 9/10 free records, 11 cylinder records (explicit radius).
+      ! Extended: gridM,Rx after icyl; 11/12 free or 13 cylinder records.
+      use, intrinsic :: iso_fortran_env, only : input_unit
+      real, intent(out) :: temp,tol,gridM
+      real :: values(13)
+      integer :: count, status, offset, pos, k
+      character(len=1024) :: line
+
+      count=0
+      do
+         read(input_unit,'(A)',iostat=status) line
+         if (status < 0) exit
+         if (status /= 0) error stop 'Could not read radial input'
+         pos=scan(line,'!#:')
+         if (pos > 0) line=line(:pos-1)
+         if (len_trim(line)==0) cycle
+         count=count+1
+         if (count > size(values)) error stop 'Too many radial input records'
+         read(line,*,iostat=status) values(count)
+         if (status /= 0) error stop 'Invalid numeric radial input record'
+      end do
+      if (count < 9) error stop 'Radial input requires at least nine records'
+      if (.not. ieee_is_finite(values(3))) error stop 'Invalid icyl'
+      if (values(3)/=0.0 .and. values(3)/=1.0) error stop 'icyl must be 0 or 1'
+      icyl=int(values(3))
+      cyl=icyl==1
+      offset=0
+      if (cyl) then
+         if (count/=11 .and. count/=13) &
+            error stop 'icyl=1 requires a cylinder radius after AA p_max (11 or 13 records)'
+         if (count==13) offset=2
+         if (.not. ieee_is_finite(values(count))) error stop 'Cylinder radius must be finite'
+         if (values(count)<=0.0) error stop 'Cylinder radius must be positive'
+      else
+         if (count>12) error stop 'Free radial input requires 9,10,11 or 12 records'
+         if (count>=11) offset=2
+      end if
+      if (.not. all(ieee_is_finite(values(:count)))) error stop 'Nonfinite radial input'
+      gridM=70.0
+      Rx=10.0
+      if (offset==2) then
+         gridM=values(4)
+         Rx=values(5)
+      end if
+      if (gridM<=0.0 .or. Rx<=0.0) error stop 'Radial grid scales must be positive'
+      temp=values(1)
+      vort=values(2)
+      aa0=values(4+offset)
+      do k=1,5
+         ! Check integer records before conversion, excluding tolerance.
+         if (k==2) cycle
+         pos=4+offset+k
+         if (values(pos)/=real(int(values(pos)))) error stop 'Expected integer radial input'
+      end do
+      tmax=int(values(5+offset))
+      tol=values(6+offset)
+      istart=int(values(7+offset))
+      ittyp=int(values(8+offset))
+      itmax=int(values(9+offset))
+      aa_pmax=1.0
+      if (count>=10+offset) aa_pmax=values(10+offset)
+      if (aa_pmax<0.01) error stop 'AA p_max must be at least 0.01'
+      if (cyl) Rx=values(count)
+   end subroutine read_radial_input
+
 !--------------------------------------------------------------------------
 !
    subroutine init_calc
@@ -12,7 +79,7 @@ contains
 !
 ! --  Get the input and rig the calculation
 !     
-      integer :: i,j,ix,ien,input_status
+      integer :: i,j,ix,ien
       real ::  x,y,z,d,phi,dv,temp, tol, gridM, restart_radius, current_radius
       real ::  a1x,b1x,a1y,b1y,a1z,b1z
       real ::  a2x,b2x,a2y,b2y,a2z,b2z
@@ -21,36 +88,13 @@ contains
 !
 ! -- input data given in qcv.inp
 !
-      read *, temp
-      read *, vort
-      read *, icyl
-      read *, aa0
-      read *, tmax
-      read *, tol
-      read *, istart
-      read *, ittyp
-      read *, itmax
-      aa_pmax = 1.0
-      read (*,*,iostat=input_status) aa_pmax
-
-      if (input_status > 0) error stop 'Could not read AA p_max'
-      if (aa_pmax < 0.01) then
-         error stop 'AA p_max must be at least 0.01'
-      end if
-      if (icyl /= 0 .and. icyl /= 1) error stop 'icyl must be 0 (free) or 1 (cylinder)'
-      cyl = icyl == 1
+      call read_radial_input(temp,tol,gridM)
 !      
 !--- Some constants
 !      
-      gridM = 70.0
-      Rx = 10.0
       tx = atan(gridM/Rx)/float(nx)
       if (cyl) then
-         ! Record 11 follows AA p_max; Rx is the physical wall radius here.
-         read (*,*,iostat=input_status) Rx
-         if (input_status /= 0) error stop 'icyl=1 requires a cylinder radius after AA p_max'
-         if (.not. ieee_is_finite(Rx)) error stop 'Cylinder radius must be finite'
-         if (Rx <= 0.0) error stop 'Cylinder radius must be positive'
+         ! read_radial_input sets Rx to the explicit physical wall radius.
          gridM = Rx
       end if
 

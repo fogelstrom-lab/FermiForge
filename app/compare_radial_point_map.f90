@@ -60,6 +60,10 @@ program compare_radial_point_map
 
   call read_new_src_radial_profile( &
     trim(order_parameter_path), trim(current_path), radial_grid, profile)
+  ! This executable compares against the unchanged historical transport map.
+  ! Production 2D embeddings retain the default full tensor reconstruction.
+  profile%legacy_transport_projection = .true.
+  print '(a)', 'comparison mode: legacy transport projection (not physical tensor embedding)'
   call read_legacy_gauss_table(trim(gauss_path), 48, 11, angular)
   call read_legacy_ozaki_table(trim(ozaki_path), energy)
   call make_uniform_cartesian_mesh( &

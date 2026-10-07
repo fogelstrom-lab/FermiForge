@@ -68,9 +68,12 @@ contains
     if (boundary_relaxation_distance < 0.0_rk) &
       error stop "Riccati boundary relaxation distance cannot be negative"
     if (size(path_coordinate) > 1) then
-      if (any(path_coordinate(2:) <= &
+      ! Equal coordinates represent the two limits of a specular collision.
+      ! Coherence is continuous across the zero-length interval; coefficients
+      ! change without integrating across a fictitious rounded reflection.
+      if (any(path_coordinate(2:) < &
               path_coordinate(:size(path_coordinate) - 1))) &
-        error stop "Riccati trajectory path coordinates are not increasing"
+        error stop "Riccati trajectory path coordinates are decreasing"
     end if
 
     number_of_samples = size(path_coordinate)

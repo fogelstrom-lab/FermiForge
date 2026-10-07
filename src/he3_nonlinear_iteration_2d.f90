@@ -1,4 +1,6 @@
 module he3_nonlinear_iteration_2d
+  use barzilai_borwein_mixing, only: bb_mixing_t
+  use polyak_mixing, only: polyak_mixing_t
   use he3_kinds, only : rk
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
   use spinful_state_2d, only : spinful_state_2d_t, allocate_spinful_state_2d
@@ -127,7 +129,7 @@ contains
 
   subroutine update_he3_state_with_anderson( &
       mesh, accelerator, current, mapped, tolerance, next, &
-      anderson_report, residual_report, active_point_mask)
+      anderson_report, residual_report, active_point_mask, simple_mixing, bb, polyak)
     type(cartesian_mesh_2d_t), intent(in) :: mesh
     type(legacy_anderson_t), intent(inout) :: accelerator
     type(spinful_state_2d_t), intent(in) :: current, mapped
@@ -136,6 +138,9 @@ contains
     type(anderson_report_t), intent(out) :: anderson_report
     type(he3_field_residual_report_t), intent(out) :: residual_report
     logical, intent(in), optional :: active_point_mask(:)
+    real(rk), intent(in), optional :: simple_mixing
+    type(bb_mixing_t), intent(inout), optional :: bb
+    type(polyak_mixing_t), intent(inout), optional :: polyak
 
     real(rk), allocatable :: current_vector(:), mapped_vector(:), next_vector(:)
 
@@ -143,10 +148,12 @@ contains
         .not. mapped%is_valid_for(mesh)) &
       error stop "Anderson state does not match the Cartesian mesh"
     if (present(active_point_mask)) then
-      if (accelerator%vector_size() /= &
-          new_src_masked_iteration_vector_size_2d( &
-            current, active_point_mask)) &
-        error stop "Anderson accelerator has the wrong masked 2D vector size"
+      if (.not. present(bb) .and. .not. present(polyak)) then
+        if (accelerator%vector_size() /= &
+            new_src_masked_iteration_vector_size_2d( &
+              current, active_point_mask)) &
+          error stop "Anderson accelerator has the wrong masked 2D vector size"
+      end if
       call compute_he3_field_residual( &
         current, mapped, residual_report, active_point_mask)
       call pack_new_src_masked_iteration_vector_2d( &
@@ -154,16 +161,41 @@ contains
       call pack_new_src_masked_iteration_vector_2d( &
         mapped, active_point_mask, mapped_vector)
     else
-      if (accelerator%vector_size() /= &
-          new_src_iteration_vector_size_2d(current)) &
-        error stop "Anderson accelerator has the wrong 2D vector size"
+      if (.not. present(bb) .and. .not. present(polyak)) then
+        if (accelerator%vector_size() /= &
+            new_src_iteration_vector_size_2d(current)) &
+          error stop "Anderson accelerator has the wrong 2D vector size"
+      end if
       call compute_he3_field_residual(current, mapped, residual_report)
       call pack_new_src_iteration_vector_2d(current, current_vector)
       call pack_new_src_iteration_vector_2d(mapped, mapped_vector)
     end if
     allocate(next_vector(size(current_vector)))
-    call accelerator%update( &
-      current_vector, mapped_vector, tolerance, next_vector, anderson_report)
+    if (present(polyak)) then
+      if(present(bb).or.present(simple_mixing)) error stop 'Polyak cannot be combined with BB/simple mixing'
+      call polyak%update(current_vector,mapped_vector,tolerance,next_vector,anderson_report)
+    else if (present(bb)) then
+      if (present(simple_mixing)) error stop "BB and simple mixing are mutually exclusive"
+      call bb%update(current_vector,mapped_vector,tolerance,next_vector,anderson_report)
+    else if (present(simple_mixing)) then
+      ! Deliberately bypass the accelerator: these vectors must not become AA history.
+      if (.not. (simple_mixing > 0.0_rk .and. simple_mixing <= 1.0_rk)) &
+        error stop "simple mixing must be in (0,1]"
+      anderson_report = anderson_report_t()
+      anderson_report%mixing = simple_mixing
+      anderson_report%max_residual = maxval(abs(mapped_vector-current_vector))
+      anderson_report%residual_norm = norm2(mapped_vector-current_vector)
+      anderson_report%legacy_relative_residual = anderson_report%residual_norm / &
+        sqrt(merge(dot_product(mapped_vector,mapped_vector), 1.0_rk, &
+          dot_product(mapped_vector,mapped_vector) >= max(tolerance,tiny(1.0_rk))))
+      anderson_report%converged = anderson_report%max_residual <= tolerance
+      next_vector = current_vector
+      if (.not. anderson_report%converged) &
+        next_vector = current_vector + simple_mixing*(mapped_vector-current_vector)
+    else
+      call accelerator%update( &
+        current_vector, mapped_vector, tolerance, next_vector, anderson_report)
+    end if
     if (present(active_point_mask)) then
       next = current
       call unpack_new_src_masked_iteration_vector_2d( &

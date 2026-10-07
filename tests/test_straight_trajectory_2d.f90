@@ -10,7 +10,8 @@ program test_straight_trajectory_2d
   call test_oblique_domain_intersection()
   call test_nonzero_pz_projection()
   call test_invariant_axis_trajectory()
-  call test_cached_affine_field_sampling()
+  call test_cached_affine_field_sampling(1)
+  call test_cached_affine_field_sampling(2)
 
   print '(a)', "straight 2D trajectory tests passed"
 
@@ -84,7 +85,8 @@ contains
   end subroutine test_invariant_axis_trajectory
 
 
-  subroutine test_cached_affine_field_sampling()
+  subroutine test_cached_affine_field_sampling(interpolation_order)
+    integer, intent(in) :: interpolation_order
     type(cartesian_mesh_2d_t) :: mesh
     type(spinful_state_2d_t) :: state
     type(straight_trajectory_2d_t) :: trajectory
@@ -115,7 +117,11 @@ contains
       end do
     end do
 
+    mesh%trajectory_interpolation_order = interpolation_order
     call build_straight_trajectory_2d(mesh, origin, momentum, 0.15_rk, trajectory)
+    if (interpolation_order == 2) &
+      call require(trajectory%stencil(trajectory%target_sample)%count > 4, &
+                   'quadratic trajectory option was not applied')
     call sample_pair_potential_along_trajectory_2d(state, trajectory, &
                                                     pair_potential, sampled_mean)
     do sample = 1, trajectory%sample_count()

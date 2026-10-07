@@ -9,6 +9,9 @@
 \usepackage{fancyhdr}
 \usepackage{hyperref}
 \usepackage{pdflscape}
+\usepackage{graphicx,listings,needspace}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,columns=fullflexible,
+ keepspaces=true,frame=single,rulecolor=\color{FFGray},showstringspaces=false}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,calc,backgrounds,shapes.geometric}
 
@@ -36,7 +39,7 @@
 \pagestyle{fancy}
 \fancyhf{}
 \lhead{FermiForge implementation note}
-\rhead{20 September 2026}
+\rhead{23 September 2026}
 \cfoot{\thepage}
 
 \setlist[itemize]{leftmargin=1.5em,itemsep=0.25em,topsep=0.35em}
@@ -89,18 +92,18 @@
   This note records the algorithm that is implemented now for a
   translation-invariant two-dimensional cross-section of a spin-triplet
   superfluid.  Its immediate purpose is to make the normal-core, A-phase-core,
-  and double-core vortex development auditable.  It also identifies the
+  double-core, and quadrupole vortex development auditable.  It also identifies the
   interfaces that can later support walls, leads, discontinuous-Galerkin
   discretisation, and portable accelerator execution.
   \end{minipage}
 
   \vfill
   \begin{tabular}{rl}
-    Document status: & living implementation note, revision 0.1\\
-    Snapshot date: & 20 September 2026\\
+    Document status: & living implementation note, revision 0.2\\
+    Snapshot date: & 23 September 2026\\
     Repository: & \url{https://github.com/fogelstrom-lab/FermiForge}\\
-    Baseline commit: & \code{3d9897e} plus the current development work tree\\
-    Primary executable: & \code{fermiforge_double_core_2d}
+    Source basis: & current development work tree (record Git hash per run)\\
+    Run guide executable: & \code{benchmark_axisymmetric_core_2d}
   \end{tabular}
   \vspace{12mm}
 
@@ -153,17 +156,20 @@ both for multiscale accuracy and for a future GPU implementation.
 \toprule
 \status{FFTeal}{Implemented} & Full complex $3\times3$ triplet field; full
 $2\times2$ spin coherence and $4\times4$ spin--Nambu propagator; static
-nonuniform rectilinear mesh; Q1 interpolation; straight rays; free-vortex
+nonuniform rectilinear mesh, smooth stretching and sparse outer extension;
+bilinear or blended-quadratic ray interpolation; straight rays; free-vortex
 asymptotic continuation; MPI point distribution; source-compatible Anderson
 mixing; checkpointing; optional zero-mode projection.\\
 \status{FFBlue}{Validated} & Unit and regression tests for mesh sampling,
 radial embedding, trajectory transport, propagator reconstruction,
 self-consistency integrands, MPI rank agreement, and normal-core radial/2D map
-comparison.  Converged radial normal- and A-core fields are references; this
-does not by itself certify every modern 2D relaxation as converged.\\
+comparison. The corrected radial and 2D A-phase solutions now agree in the
+extended-domain comparison accepted by the project owner. This validates that
+tested configuration, not all core types, temperatures or domain sizes.\\
 \status{FFOrange}{Experimental} & Free double-core relaxation, angle-dependent
 asymptotic state fitting, dependent-halo regeneration, staged domain studies,
-zero-mode removal, and held-out exterior ``shadow'' iteration.\\
+zero-mode removal, held-out exterior ``shadow'' iteration, and the newly
+prepared quadrupole seed (no converged quadrupole result claimed).\\
 \status{FFRed}{Planned} & Error-driven block AMR, discontinuous-Galerkin
 transport, container walls and reflection, interfaces/leads, dipole-energy
 self-consistency, physical observable normalisations, GPU offload, and
@@ -207,7 +213,7 @@ The code-basis triplet field is
 and the gap matrix is
 \begin{equation}
   \widehat\Delta(\phat,\bm r)
-  =\sum_{\alpha i}A_{\alpha i}(\bm r),
+  =\sum_{\alpha i}A_{\alpha i}(\bm r)
        \ii\sigma_\alpha\sigma_y p_i
   =(\bm d\cdot\bm\sigma)\ii\sigma_y
   =\begin{pmatrix}
@@ -247,7 +253,7 @@ current code does not integrate the matrix equation directly.  It evolves two
 stable Riccati/coherence branches from opposite ends of each ray and
 reconstructs $\check g$ at the target~\cite{eschrig2000}.
 
-\subsection{Projected ray and Q1 field sampling}
+\subsection{Projected ray and spatial field sampling}
 
 For target $\bm r_0=(x_0,y_0)$ and direction \eqref{eq:momentum}, the projected
 trajectory is
@@ -277,6 +283,49 @@ It acts directly on every complex Cartesian component of $A$ and every real
 component of $\bm v$; amplitudes and phases are not interpolated separately.
 The four point indices and weights form a reusable stencil.  Thus fixed
 geometry can later be cached independently of changing field values.
+
+Recent production inputs select \code{trajectory_interpolation_order=2}.
+For one interior interval $[x_i,x_{i+1}]$, the implemented interpolant is
+\begin{equation}
+ {\cal I}_2 f(x)=\tfrac12\left[
+ L_{i-1,i,i+1}f(x)+L_{i,i+1,i+2}f(x)\right],
+ \label{eq:blendedquadratic}
+\end{equation}
+where $L_{a,b,c}$ is the three-node Lagrange polynomial on the actual,
+possibly nonuniform coordinates. At an outer boundary, one one-sided
+quadratic is used. The two-dimensional weights are tensor products of these
+one-dimensional weights, using up to $4\times4=16$ nodes, not a fixed
+nine-node stencil. The scheme reproduces quadratics, interpolates cell
+endpoints continuously, and avoids a midpoint stencil switch. It is not a
+monotonicity-preserving or positivity-limited interpolation.
+
+This setting changes \emph{trajectory sampling}. The generic state sampler
+used to extract the asymptotic fit still uses the four-node bilinear
+operator \eqref{eq:q1}. Linear interpolation between consecutive trajectory
+samples at RK stages is also unchanged. These three interpolation operations
+must not be conflated.
+
+\subsection{Trajectory extent and cost}
+
+The storage rectangle, active radius and Riccati endpoint radius are separate.
+For impact parameter $b$ in the cross-section and polar angle $\vartheta$ to
+the $z$ axis, the enclosing circle gives the complete physical path length
+\begin{equation}
+ L=\frac{2\sqrt{R_{\rm out}^2-b^2}}{|\sin\vartheta|}.
+ \label{eq:trajectorylength}
+\end{equation}
+The exactly axial case is handled separately by a single spatial sample.
+The forward and reverse integrations cover complementary portions up to the
+target. With $R_{\rm out}=100\xi_0$, a central transverse ray spans
+$200\xi_0$, about 800 intervals at maximum step $0.25\xi_0$, before
+pole-dependent RK substeps. Tilting toward $z$ increases the path length.
+
+The extended A-phase test has 7453 active points, versus 3065 previously,
+and changed the endpoint radius from 70 to $100\xi_0$. The user observed
+about 3620 s per update on ten laptop MPI ranks. This is a measured run
+cost, not a universal timing prediction. The compact quadrupole case uses
+3481 active points and $R_{\rm out}=70\xi_0$.
+
 
 \subsection{Implemented Riccati coefficient equation}
 
@@ -430,7 +479,9 @@ gap prefactor is
   \label{eq:ozaki-prefactor}
 \end{equation}
 The transport temperature is therefore the value stored in the Ozaki table;
-the seed temperature is only an initialisation parameter.
+the separate seed temperature in the double-core driver is only an
+initialisation parameter. The axisymmetric-benchmark driver passes the Ozaki
+temperature directly to its historical seed initializer.
 
 For one direction and pole define the three anomalous combinations
 \begin{align}
@@ -462,11 +513,29 @@ observable requires a separately documented prefactor.
 
 \section{Spatial mesh, active domain, and free-vortex exterior}
 
-\subsection{Static multiscale rectilinear mesh}
+\subsection{Smooth and extended rectilinear meshes}
 
-The current 2D mesh is a nonuniform tensor-product grid with fine, medium, and
-coarse coordinate zones.  It is useful for resolving a hard core, a broader
-soft core, and an outer sampling halo with fewer nodes than a uniform grid.
+The storage mesh remains a tensor product of Cartesian coordinates; circles
+and ellipses select active or fitting regions but are not polar mesh lines.
+The older \code{multiscale} option has three piecewise-uniform spacing bands.
+The recent \code{smooth} option removes abrupt band transitions by setting
+\begin{equation}
+ x_i=H\frac{\sinh(\lambda u_i)}{\sinh\lambda},\qquad
+ u_i=\frac{2i-N}{N},\quad i=0,\ldots,N,
+ \label{eq:smoothmesh}
+\end{equation}
+and similarly for $y$. Here $N$ is even, $H$ is the half-width and
+$\lambda=\code{smooth_stretch}$; $\lambda=0$ gives a uniform grid.
+Larger $\lambda$ concentrates nodes near the centre at fixed $N,H$.
+
+For \code{extended_smooth}, a base smooth grid with half-width
+$H_{\rm core}$ is retained exactly. Successive outer spacings are
+$h_j=cg^{j-1}$, $g=\code{outer_spacing_growth}$. The number of bands is
+chosen using the base edge spacing; the common factor $c$ is then adjusted
+so their sum is $H-H_{\rm core}$, avoiding a tiny last cell. The extension
+is mirrored on each axis. Thus these are sparse rectangular outer bands,
+not actual annuli or an elliptic-to-circular curvilinear mesh. Both core
+resolution and outer extent can be changed independently using this option.
 It is \emph{not} error-driven adaptive mesh refinement.  The mesh and active
 mask remain fixed during one Anderson solve; a mesh change invalidates both
 cached interpolation stencils and the nonlinear history.
@@ -479,7 +548,7 @@ important:
   \item[Update points] Independent nonlinear unknowns packed into the
   Anderson vector.  Pinned points and dependent exterior points are excluded.
   \item[Dependent halo] Stored mesh points regenerated from the asymptotic
-  model after each accepted update.  They remain available for Q1 trajectory
+  model after each accepted update.  They remain available for trajectory
   sampling but are not independent Anderson degrees of freedom.
 \end{description}
 Thus ``inactive'' never means nonexistent.  A point can be inactive for
@@ -494,8 +563,11 @@ For a singly quantised free vortex, the bulk reference is
   \qquad R\in SO(3).
   \label{eq:bulk-tail}
 \end{equation}
-The phase $\phi_0$ and rotation $R$ can be fitted from an annular/elliptical
-reference surface or supplied theoretically.  Following Eqs.~(19)--(20) of
+In the double-core driver the phase $\phi_0$ and rotation $R$ can be fitted from an annular/elliptical
+reference surface or supplied theoretically. The axisymmetric-benchmark driver
+uses the theoretical bulk reference (identity rotation and zero phase offset);
+its tail amplitudes are nevertheless taken from the current state, not the
+archived radial solution. Following Eqs.~(19)--(20) of
 the double-core manuscript~\cite{dcvlong}, the exterior field is represented
 as
 \begin{equation}
@@ -560,103 +632,23 @@ $\bm v_c=\bm v(R_c,\phi)$, the actual two-point coefficient solve is
 
 Figures~\ref{fig:multiscale-grid-masks} and
 \ref{fig:asymptotic-extraction} summarise the present construction.  The first
-uses a deliberately small multiscale cell so that every stored point and every
-change of spacing remains visible.  Its dimensions are illustrative rather
-than production choices.  The second unwraps one fixed-$\phi$ ray and
+uses reduced smooth grids so that every stored point and the gradual
+change of spacing remain visible. The extents match the recent examples,
+but the node count is deliberately reduced. The second unwraps one fixed-$\phi$ ray and
 separates coefficient extraction, halo construction, and independent exterior
 verification.
 
 \begin{figure}[p]
 \centering
-\begin{tikzpicture}[x=1cm,y=1cm,font=\small,line cap=round,line join=round]
-  \path[use as bounding box] (0,0) rectangle (15.35,13.25);
-  \coordinate (O) at (5.15,7.05);
-
-  \node[anchor=west,font=\large\bfseries] at (0.65,12.85)
-    {Small illustrative multiscale cell};
-  \node[anchor=west,font=\large\bfseries] at (10.45,12.85)
-    {How to read it};
-
-  % Reduced tensor-product mesh: 15 coordinates per direction.
-  \def\FFIllustrativeCoordinates{%
-    -6,-4,-3,-2,-1.5,-1,-0.5,0,0.5,1,1.5,2,3,4,6}
-
-  % The square [-6,6]^2 is mapped without aspect distortion.
-  \begin{scope}[shift={(O)},x=0.75cm,y=0.75cm]
-    \clip (-6.12,-6.12) rectangle (6.12,6.12);
-    \fill[FFOrangePale] (-6,-6) rectangle (6,6);
-    \fill[FFBluePale] (0,0) ellipse [x radius=2.5,y radius=3.0];
-    \draw[FFInk,thick] (-6,-6) rectangle (6,6);
-
-    % Boundaries of the fine, medium, and coarse tensor-product zones.
-    \draw[FFGray!55,densely dotted,line width=0.55pt]
-      (-2,-2) rectangle (2,2);
-    \draw[FFGray!55,densely dotted,line width=0.55pt]
-      (-4,-4) rectangle (4,4);
-
-    % Every dot is a stored interpolation node in this example cell.
-    \foreach \gx in \FFIllustrativeCoordinates {
-      \foreach \gy in \FFIllustrativeCoordinates {
-        \fill[FFInk!72] (\gx,\gy) circle[radius=1.05pt];
-      }
-    }
-
-    % Illustrative fit surfaces and independent-update mask.
-    \draw[FFIndigo,very thick]
-      (0,0) ellipse [x radius=2.5,y radius=3.0];
-    \draw[FFOrange,thick,dashed]
-      (0,0) ellipse [x radius=2.0,y radius=2.5];
-    \draw[FFTeal,thick,dash pattern=on 5pt off 2pt on 1pt off 2pt]
-      (0,0) ellipse [x radius=1.5,y radius=2.0];
-
-    % A minimal double-core symbol and one generic quasiclassical trajectory.
-    \draw[FFIndigo,thick] (0,0.75) ellipse [x radius=0.48,y radius=0.64];
-    \draw[FFIndigo,thick] (0,-0.75) ellipse [x radius=0.48,y radius=0.64];
-    \fill[FFInk] (0,0.75) circle[radius=1.5pt];
-    \fill[FFInk] (0,-0.75) circle[radius=1.5pt];
-    \draw[FFGray,->,thick,dashed] (-5.35,4.15)--(5.20,-3.45);
-  \end{scope}
-
-  \begin{scope}[shift={(O)},x=0.75cm,y=0.75cm]
-    \draw[->,FFInk,thick] (-5.75,0)--(5.70,0)
-      node[above left,fill=white,inner sep=1pt] {$x/\xi_0$};
-    \draw[->,FFInk,thick] (0,-5.75)--(0,5.70)
-      node[below right,fill=white,inner sep=1pt] {$y/\xi_0$};
-  \end{scope}
-
-  % External explanations keep the cell itself uncluttered.
-  \node[anchor=north west,align=left,text width=4.35cm] at (10.45,12.15)
-    {\textbf{Stored nodes}\\[1mm]
-     $15\times15=225$ points on
-     $[-6\xi_0,6\xi_0]^2$.  Each dot is one Q1 interpolation node.};
-
-  \node[anchor=north west,align=left,text width=4.35cm] at (10.45,9.70)
-    {\textbf{Three spacing bands}\\[1mm]
-     $\Delta=0.5\xi_0$ for $|x|,|y|\le2\xi_0$;\\
-     $\Delta=1\xi_0$ out to $4\xi_0$;\\
-     $\Delta=2\xi_0$ in the outer band.};
-
-  \node[anchor=west,font=\bfseries] at (10.45,6.85) {State regions};
-  \draw[FFIndigo,very thick] (10.45,6.20)--(11.25,6.20);
-  \node[anchor=west] at (11.42,6.20) {$R_{\rm act}(\phi)$: updated};
-  \draw[FFOrange,thick,dashed] (10.45,5.45)--(11.25,5.45);
-  \node[anchor=west] at (11.42,5.45) {$R_c(\phi)$: matching};
-  \draw[FFTeal,thick,dash pattern=on 5pt off 2pt on 1pt off 2pt]
-    (10.45,4.70)--(11.25,4.70);
-  \node[anchor=west] at (11.42,4.70) {$R_{\rm in}(\phi)$: inner fit};
-  \node[anchor=north west,align=left,text width=4.35cm] at (10.45,4.15)
-    {Inside $R_{\rm act}$: independent Anderson variables.  Outside:
-     stored halo rebuilt from the fitted tail.};
-
-  \draw[FFGray,->,thick,dashed] (10.45,1.65)--(11.35,1.65);
-  \node[anchor=west,align=left,text width=3.75cm] at (11.52,1.65)
-    {generic transport ray};
-\end{tikzpicture}
-\caption{Reduced mesh showing the multiscale-grid principle and the split
-between the independent update region and dependent asymptotic halo.  All
-$225$ displayed nodes occupy their stated coordinates, but the small cell and
-the ellipse sizes are illustrative rather than production-resolution choices.
-Line style and direct labels duplicate every colour distinction.}
+\includegraphics[width=\textwidth,height=190mm,keepaspectratio]{figures/grid_construction.pdf}
+\caption{The actual smooth-coordinate construction on reduced 24-cell base
+grids, so individual nodes remain visible. Top: the compact quadrupole
+geometry, $H=22$, $R_{\rm act}=20$, $R_{\rm in}=14$, $R_c=17$.
+Bottom: the extended A-phase geometry; the blue square encloses the preserved
+$[-20,20]^2$ base grid, with sparse bands out to $H=60$.
+Production uses 64 base cells, hence 65 nodes per axis before extension.
+Filled dots are independent update nodes, open dots are dependent halo nodes.
+The curves denote masks and fit surfaces, not boundaries reflecting rays.}
 \label{fig:multiscale-grid-masks}
 \end{figure}
 
@@ -750,6 +742,8 @@ The two-surface construction is the minimum identifiable fit for
 \eqref{eq:vasymptotic}.  A later overdetermined annular least-squares fit should
 add radial-window and angular-resolution diagnostics without relaxing the
 block constraint \eqref{eq:block-tail}.
+
+\input{core_initialization}
 
 \section{Nonlinear iteration}
 
@@ -851,14 +845,14 @@ outside that loop and cannot modify the accepted production state.
 \begin{tikzpicture}[node distance=7mm and 13mm, font=\small]
   \node[ffbox, text width=44mm] (input) {Read namelist and initialise MPI};
   \node[ffbox, below=of input, text width=44mm] (init)
-    {Rank 0: import/restart or construct normal, A, London, or historical seed};
+    {Rank 0: import/restart or construct normal, A, double-core, or quadrupole seed};
   \node[ffbox, below=of init, text width=44mm] (setup)
     {Broadcast mesh/state; build quadratures, masks, endpoint model, and dependent halo};
 
   \node[ffgreen, right=24mm of input, text width=47mm] (distribute)
     {Cyclically assign mapped target points to MPI ranks};
   \node[ffgreen, below=of distribute, text width=47mm] (pointmap)
-    {For each local target: directions $\times$ Ozaki poles; Q1 ray sampling; two-sided Riccati transport; reconstruct $\check g$; accumulate map};
+    {For each local target: directions $\times$ Ozaki poles; linear/quadratic ray sampling; two-sided Riccati transport; reconstruct $\check g$; accumulate map};
   \node[ffgreen, below=of pointmap, text width=47mm] (reduce)
     {All-reduce mapped $A$, $\bm v$, completion flags, timings, and maximum normalisation error};
 
@@ -873,7 +867,7 @@ outside that loop and cannot modify the accepted production state.
   \node[ffbox, right=22mm of stop, text width=47mm] (shadow)
     {Optional held-out exterior passive map or isolated shadow solve};
   \node[ffbox, below=of shadow, text width=47mm] (output)
-    {Write final field, sparse state, metrics, sampled residuals, probes, and plots};
+    {Write fields, metrics and probes; MPI finalise; Python plots saved data};
 
   \draw[ffarrow] (input)--(init);
   \draw[ffarrow] (init)--(setup);
@@ -909,7 +903,7 @@ For one target node $a$, the map can be expressed as the following nested
 algorithm:
 \begin{enumerate}
   \item For each angular quadrature direction, intersect the projected ray
-  with the rectangular mesh, insert $s=0$, limit path spacing, and cache Q1
+  with the rectangular mesh, insert $s=0$, limit path spacing, and build linear/quadratic
   stencils.
   \item Sample $A$ and $\bm v$ on the interior path.  If the free-vortex
   endpoint is enabled, extend the path through the analytic exterior to its
@@ -958,7 +952,7 @@ shows the principal call direction, not every Fortran \code{use} association.
     {\texttt{he3\_serial\_point\_map}\\direction--pole loops};
 
   \node[ffgreen, below left=13mm and 11mm of serial, text width=40mm] (ray)
-    {\texttt{straight\_trajectory\_2d}\\\texttt{bilinear\_field\_sampler\_2d}\\ray and cached Q1 stencils};
+    {\texttt{straight\_trajectory\_2d}\\\texttt{bilinear\_field\_sampler\_2d}\\ray and linear/quadratic stencils};
   \node[ffgreen, below=13mm of serial, text width=40mm] (se)
     {\texttt{trajectory\_self\_energy\_2d}\\$\bm d=A\phat$, $\nu=a_{\rm FL}\phat\!\cdot\!\bm v$};
   \node[ffgreen, below right=13mm and 11mm of serial, text width=40mm] (riccati)
@@ -1127,7 +1121,8 @@ Development follows a ladder in which each new layer retains a lower-level
 oracle:
 \begin{enumerate}
   \item manufactured constant, affine, and bilinear fields test mesh lookup
-  and Q1 interpolation;
+  and bilinear interpolation; manufactured quadratic fields additionally test
+the blended-quadratic sampler;
   \item radial harmonic conversion and Cartesian embedding test basis and
   phase conventions;
   \item frozen trajectory checkpoints test the two legacy Riccati branches;
@@ -1145,7 +1140,7 @@ oracle:
 
 The seed family is also provenance-labelled.  Radial normal/A solutions are
 reference embeddings; \code{nop}, \code{aop}, and \code{dop} reproduce the
-historical initialisation logic; the regularised London double-core seed is a
+historical initialisation logic; \code{qop} is a new quadrupole seed; the regularised London double-core seed is a
 smooth model seed, not the same object as historical \code{dop}; imported
 legacy 2D fields provide a later numerical oracle.
 
@@ -1155,9 +1150,11 @@ legacy 2D fields provide a later numerical oracle.
 \toprule
 Topic & Present boundary of the implementation\\
 \midrule
-Spatial adaptation & Fine/medium/coarse tensor-product mesh and staged active
+Spatial adaptation & Piecewise, smooth and extended-smooth tensor-product meshes and staged active
 ellipse changes exist.  There is no quadtree, local error-driven refinement,
-two-to-one balancing, or automatic field transfer/restart.\\
+two-to-one balancing, or general automatic field transfer. The explicit \code{restart_core} mode
+preserves exact shared core nodes while initialising new outer nodes from a
+specified radial reference.\\
 Walls and devices & The general 2D solver has a free-vortex analytic exterior.
 Specular reflection exists only in historical work and is not connected to
 the modern 2D transport path.  Leads, weak links, diffuse scattering, and
@@ -1168,7 +1165,7 @@ Accelerators & Kernels and data flow are being separated for batching, but no
 OpenMP-target, OpenACC, CUDA, HIP, or SYCL offload path is implemented.\\
 DG/FEM & The discontinuous-Galerkin approach of Seja and
 Löfwander~\cite{seja2022} is a target architecture for general devices, not a
-feature of the present Q1-sampled ray solver.  DG is a finite-element method,
+feature of the present interpolated-ray solver.  DG is a finite-element method,
 not a finite-difference method.\\
 Scaling & MPI distributes target points with a replicated field.  Functional
 rank agreement has been tested; production strong/weak scaling and
@@ -1221,6 +1218,8 @@ This ordering preserves a trusted reference at each step: radial source
 $\rightarrow$ modern scalar CPU map $\rightarrow$ 2D MPI relaxation
 $\rightarrow$ adaptive/DG CPU solver $\rightarrow$ batched accelerator solver.
 
+\input{standalone_run_guide}
+
 \section{Reproducibility checklist for a run}
 
 A result should archive enough information to reconstruct both the physical
@@ -1246,8 +1245,8 @@ map and the numerical approximation:
 
 \begin{verbatim}
 MPI initialise
-rank 0: read input; import/restart or construct seed
-broadcast mesh and full state
+read input; import/restart or construct seed (driver-specific ownership)
+synchronise mesh and full state
 read angular and Ozaki rules; configure endpoint and masks
 regenerate dependent asymptotic halo
 
@@ -1256,7 +1255,7 @@ for nonlinear iteration:
     for each local target point:
         accumulator = 0
         for each angular direction:
-            build projected ray and cached Q1 stencils
+            build projected ray and linear/quadratic stencils
             sample A and current-related field
             extend ray through analytic exterior when enabled
             for each positive Ozaki pole:
@@ -1273,8 +1272,9 @@ for nonlinear iteration:
     write history/checkpoint; test stop condition
 
 optional: freeze production state and evaluate/iterate held-out exterior probes
-rank 0: write final fields, metrics, residuals, probes, plots
-MPI finalise
+rank 0: write final fields, metrics, residuals, optional probes
+MPI finalise (per-rank shutdown audit)
+Python runner: plot saved outputs and preserve any launcher failure
 \end{verbatim}
 
 \section{Principal source-to-module correspondence}
@@ -1290,7 +1290,7 @@ Concern & Current module or application layer\\
 \endhead
 Typed mesh and state & \code{cartesian_mesh_2d}, \code{spinful_state_2d}\\
 Iteration packing & \code{new_src_iteration_layout_2d}\\
-Q1 interpolation and rays & \code{bilinear_field_sampler_2d},
+Spatial interpolation and rays & \code{bilinear_field_sampler_2d},
 \code{straight_trajectory_2d}\\
 Trajectory self-energy & \code{trajectory_self_energy_2d}\\
 Riccati propagation & \code{riccati_segment},
@@ -1308,7 +1308,8 @@ Zero modes & \code{spinful_tangent_projection_2d}\\
 Seeds & \code{double_core_seed_2d}, \code{historical_core_seed_2d}, radial
 embedding/import modules\\
 Application workflow & \code{app/benchmark_legacy_double_core_map_2d.f90},
-built as \code{fermiforge_double_core_2d}\\
+built as \code{fermiforge_double_core_2d}; circular-mask workflow:
+\code{benchmark_axisymmetric_core_2d}\\
 Run orchestration and plots & scripts in \code{tools/}\\
 \bottomrule
 \end{longtable}

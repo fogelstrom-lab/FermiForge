@@ -1,11 +1,15 @@
 program benchmark_legacy_double_core_map_2d
   use mpi_f08
+  use mpi_shutdown_audit, only: finalize_with_audit
+  use he3_fermi_liquid, only: resolve_fs1
+  use he3_bulk_gap, only: resolve_bulk_gap
   use he3_kinds, only : rk
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t, &
     make_rectilinear_cartesian_mesh, make_uniform_cartesian_mesh, &
-    make_symmetric_multiscale_cartesian_mesh
+    make_symmetric_multiscale_cartesian_mesh, make_smooth_cartesian_mesh
   use spinful_state_2d, only : spinful_state_2d_t, &
     allocate_spinful_state_2d
+  use bilinear_field_sampler_2d, only : sample_spinful_state_2d
   use spinful_field_io_2d, only : read_spinful_field_map_2d, &
     write_spinful_field_map_2d
   use spinful_sparse_state_io_2d, only : &
@@ -22,7 +26,7 @@ program benchmark_legacy_double_core_map_2d
   use historical_core_seed_2d, only : historical_core_seed_report_t, &
     initialize_historical_core_seed_2d
   use he3_quadrature, only : angular_quadrature_3d_t, ozaki_quadrature_t, &
-    read_legacy_gauss_table, read_legacy_ozaki_table
+    read_legacy_gauss_table, read_legacy_ozaki_table, generate_ozaki_quadrature, write_ozaki_table
   use he3_mpi_field_map_2d, only : he3_mpi_field_map_diagnostics_t, &
     evaluate_mpi_he3_field_map, update_mpi_he3_state_with_anderson
   use he3_nonlinear_iteration_2d, only : he3_field_residual_report_t, &
@@ -80,6 +84,8 @@ program benchmark_legacy_double_core_map_2d
   character(len=32) :: update_region, zero_mode_projection
   integer :: azimuth_count, ierr, input_status, input_unit
   integer :: anderson_history_limit, history_unit
+  integer :: trajectory_interpolation_order = 1
+  real(rk) :: scratch_smooth_stretch = 2.3_rk
   integer :: asymptotic_probe_iteration_stencil_radius
   integer :: asymptotic_probe_iterations
   integer :: asymptotic_probe_anderson_history_limit
@@ -94,6 +100,10 @@ program benchmark_legacy_double_core_map_2d
   integer :: rank, rank_count, sparse_restart_applied_points
   integer :: result_integer
   real(rk) :: asymptotic_bulk_gap, asymptotic_fit_inner_radius
+  real(rk) :: temperature = -1.0_rk, ozaki_cutoff = 50.0_rk
+  character(len=16) :: ozaki_mode = 'file'
+  character(len=16) :: bulk_gap_mode = 'auto'
+  real(rk) :: fs1 = huge(1.0_rk)
   real(rk) :: asymptotic_matching_radius, asymptotic_outer_radius
   real(rk) :: asymptotic_fit_inner_radius_x
   real(rk) :: asymptotic_fit_inner_radius_y
@@ -141,7 +151,10 @@ program benchmark_legacy_double_core_map_2d
   logical :: solve_requested, update_outer_probes, use_zero_mode_projection
 
   namelist /legacy_double_core_map_benchmark/ benchmark_directory, &
+    temperature, ozaki_cutoff, ozaki_mode, bulk_gap_mode, fs1, &
     gauss_file, ozaki_file, azimuth_count, polar_count, feedback_scale, &
+    trajectory_interpolation_order, &
+    scratch_smooth_stretch, &
     trajectory_maximum_step, minimum_substep_count, &
     boundary_relaxation_distance, global_probe_radius, &
     asymptotic_ray_probe_count, asymptotic_probe_file, &
@@ -276,6 +289,19 @@ program benchmark_legacy_double_core_map_2d
   if (len_trim(output_override) > 0) metrics_file = output_override
   call get_command_argument(3, output_override)
   if (len_trim(output_override) > 0) sample_file = output_override
+  select case(trim(ozaki_mode))
+  case('generate')
+    call generate_ozaki_quadrature(temperature,ozaki_cutoff,energy)
+  case('file')
+    if (temperature /= -1.0_rk) error stop "temperature requires ozaki_mode='generate'"
+    call read_legacy_ozaki_table(trim(ozaki_file), energy)
+  case default
+    error stop "ozaki_mode must be generate or file"
+  end select
+  call resolve_fs1(fs1,feedback_scale)
+  if(rank==0.and.fs1/=huge(1.0_rk)) print *, "Fs1, feedback_scale: ",fs1,feedback_scale
+  call resolve_bulk_gap(bulk_gap_mode,ozaki_mode,energy,asymptotic_bulk_gap)
+  if(rank==0) print '(a,a,a,es24.16)', 'Bulk gap (',trim(bulk_gap_mode),') = ',asymptotic_bulk_gap
   call validate_scalar_input()
 
   call import_and_broadcast_state()
@@ -283,7 +309,9 @@ program benchmark_legacy_double_core_map_2d
   call configure_endpoint()
   call read_legacy_gauss_table( &
     trim(gauss_file), azimuth_count, polar_count, angular)
-  call read_legacy_ozaki_table(trim(ozaki_file), energy)
+
+  if(rank==0) call write_ozaki_table(trim(metrics_file)//'.ozaki.dat', &
+    merge(ozaki_cutoff,real(energy%cutoff_index,rk),ozaki_mode=='generate'),energy)
   call make_probe_masks()
   call make_asymptotic_halo_masks()
   call make_asymptotic_probe_iteration_mask()
@@ -349,7 +377,11 @@ program benchmark_legacy_double_core_map_2d
       terminal_status = "map_failure"
       exit
     end if
-    if (rank == 0) call compute_current_residuals()
+    if (rank == 0) then
+      call compute_current_residuals()
+      ! Save the raw map defect before Anderson mixing or zero-mode projection.
+      call write_sampled_residuals(iteration)
+    end if
     if (.not. solve_requested) then
       if (rank == 0) call write_single_map_history(iteration)
       exit
@@ -442,7 +474,7 @@ program benchmark_legacy_double_core_map_2d
   call require_mpi(ierr == MPI_SUCCESS, &
     "double-core benchmark result broadcast failed")
   benchmark_passed = result_integer == 1
-  call MPI_Finalize(ierr)
+  call finalize_with_audit(trim(metrics_file), ierr)
   call require_mpi(ierr == MPI_SUCCESS, "MPI finalization failed")
   if (.not. benchmark_passed) &
     error stop "double-core transport/iteration evaluation failed"
@@ -460,7 +492,7 @@ contains
       any(asymptotic_matching_radii /= 0.0_rk)
     all_elliptical_radii = all(asymptotic_fit_inner_radii > 0.0_rk) .and. &
       all(asymptotic_matching_radii > 0.0_rk)
-    if (len_trim(gauss_file) == 0 .or. len_trim(ozaki_file) == 0) &
+    if (len_trim(gauss_file) == 0 .or. (ozaki_mode=='file'.and.len_trim(ozaki_file)==0)) &
       error stop "double-core quadrature paths cannot be blank"
     if (azimuth_count < 1 .or. polar_count < 1) &
       error stop "double-core quadrature counts must be positive"
@@ -514,13 +546,16 @@ contains
          asymptotic_outer_radius <= maxval(asymptotic_matching_radii))) &
       error stop "invalid nested elliptical asymptotic surfaces"
     if (trim(initialization_mode) /= "legacy_split" .and. &
+        trim(initialization_mode) /= "legacy_resampled" .and. &
         trim(initialization_mode) /= "restart" .and. &
         trim(initialization_mode) /= "regularized_london" .and. &
         trim(initialization_mode) /= "historical_nop" .and. &
         trim(initialization_mode) /= "historical_aop" .and. &
-        trim(initialization_mode) /= "historical_dop") &
+        trim(initialization_mode) /= "historical_dop" .and. &
+        trim(initialization_mode) /= "historical_qop") &
       error stop "unknown double-core initialization mode"
     if ((trim(initialization_mode) == "legacy_split" .or. &
+         trim(initialization_mode) == "legacy_resampled" .or. &
          trim(initialization_mode) == "restart") .and. &
         len_trim(benchmark_directory) == 0) &
       error stop "legacy double-core initialization needs a benchmark directory"
@@ -528,11 +563,15 @@ contains
         len_trim(restart_field_file) == 0) &
       error stop "double-core restart needs a field file"
     if (trim(initialization_mode) == "regularized_london" .or. &
+        trim(initialization_mode) == "legacy_resampled" .or. &
         trim(initialization_mode) == "historical_nop" .or. &
         trim(initialization_mode) == "historical_aop" .or. &
-        trim(initialization_mode) == "historical_dop") then
+        trim(initialization_mode) == "historical_dop" .or. &
+        trim(initialization_mode) == "historical_qop") then
       select case (trim(scratch_mesh_kind))
-      case ("uniform")
+      case ("uniform", "smooth")
+        if (scratch_smooth_stretch < 0.0_rk .or. scratch_smooth_stretch > 10.0_rk) &
+          error stop 'smooth stretch must be in [0,10]'
         if (scratch_half_width <= 0.0_rk .or. &
             scratch_number_of_cells < 2 .or. &
             modulo(scratch_number_of_cells, 2) /= 0) &
@@ -548,7 +587,7 @@ contains
             scratch_coarse_spacing < scratch_medium_spacing) &
           error stop "invalid scratch multiscale mesh controls"
       case default
-        error stop "scratch_mesh_kind must be uniform or multiscale"
+        error stop "scratch_mesh_kind must be uniform, multiscale or smooth"
       end select
       if (abs(half_core_offset_y) >= scratch_half_width) &
         error stop "scratch core probes lie outside the generated mesh"
@@ -563,7 +602,8 @@ contains
     end if
     if ((trim(initialization_mode) == "historical_nop" .or. &
          trim(initialization_mode) == "historical_aop" .or. &
-         trim(initialization_mode) == "historical_dop") .and. &
+         trim(initialization_mode) == "historical_dop" .or. &
+         trim(initialization_mode) == "historical_qop") .and. &
         (seed_reduced_temperature < 0.0_rk .or. &
          seed_reduced_temperature >= 1.0_rk)) &
       error stop "historical seed reduced temperature must be in [0,1)"
@@ -611,6 +651,10 @@ contains
   subroutine validate_mesh_controls()
     real(rk) :: edge_distance
 
+    if (trajectory_interpolation_order /= 1 .and. trajectory_interpolation_order /= 2) &
+      error stop 'trajectory_interpolation_order must be 1 or 2'
+    mesh%trajectory_interpolation_order = trajectory_interpolation_order
+
     edge_distance = min( &
       abs(mesh%x_minimum), abs(mesh%x_maximum), &
       abs(mesh%y_minimum), abs(mesh%y_maximum))
@@ -632,11 +676,30 @@ contains
 
 
   subroutine import_and_broadcast_state()
-    integer :: dimensions(2), node
+    integer :: dimensions(2), node, point
+    type(cartesian_mesh_2d_t) :: source_mesh
+    type(spinful_state_2d_t) :: source_state
+    real(rk) :: coordinate(2)
+    logical :: inside
     real(rk), allocatable :: x_coordinates(:), y_coordinates(:)
 
     if (rank == 0) then
       select case (trim(initialization_mode))
+      case ("legacy_resampled")
+        call read_legacy_split_field_directory_2d( &
+          trim(benchmark_directory), source_mesh, source_state, import_report)
+        call make_scratch_mesh()
+        call allocate_spinful_state_2d(mesh, state)
+        do point = 1, mesh%point_count()
+          coordinate = mesh%point_coordinate(point)
+          call sample_spinful_state_2d(source_mesh, source_state, &
+            coordinate(1), coordinate(2), state%order_parameter(:, :, point), &
+            state%current_mean_field(:, point), inside)
+          if (.not. inside) &
+            error stop "legacy transfer target lies outside the archived mesh"
+        end do
+        seed_report = double_core_seed_report_t()
+        historical_seed_report = historical_core_seed_report_t()
       case ("regularized_london")
         call make_scratch_mesh()
         call initialize_regularized_london_double_core_2d( &
@@ -644,7 +707,7 @@ contains
           seed_core_width, seed_domain_wall_width, state, seed_report)
         import_report = legacy_split_field_report_2d_t()
         historical_seed_report = historical_core_seed_report_t()
-      case ("historical_nop", "historical_aop", "historical_dop")
+      case ("historical_nop", "historical_aop", "historical_dop", "historical_qop")
         call make_scratch_mesh()
         call initialize_historical_core_seed_2d( &
           mesh, initialization_mode(12:14), asymptotic_bulk_gap, &
@@ -708,6 +771,9 @@ contains
 
   subroutine make_scratch_mesh()
     select case (trim(scratch_mesh_kind))
+    case ("smooth")
+      call make_smooth_cartesian_mesh(scratch_half_width, scratch_number_of_cells, &
+                                      scratch_smooth_stretch, mesh)
     case ("uniform")
       call make_uniform_cartesian_mesh( &
         -scratch_half_width, scratch_half_width, scratch_number_of_cells, &
@@ -1454,10 +1520,18 @@ contains
          action="write", iostat=status, iomsg=message)
     if (status /= 0) &
       error stop "cannot open double-core metrics: " // trim(message)
+    if(fs1/=huge(1.0_rk)) write(unit,'(a,es24.16e3)') 'fs1=',fs1
+    write(unit,'(a,es24.16e3)') 'resolved_feedback_scale=',feedback_scale
+    write(unit,'(a,a)') 'bulk_gap_mode=',trim(bulk_gap_mode)
+    write(unit,'(a,es24.16e3)') 'bulk_gap=',asymptotic_bulk_gap
+    write(unit,'(a,a)') 'ozaki_mode=',trim(ozaki_mode)
+    write(unit,'(a,es24.16e3)') 'temperature=',energy%temperature
+    write(unit,'(a,i0)') 'ozaki_poles=',energy%pole_count()
     if (trim(initialization_mode) == "regularized_london" .or. &
         trim(initialization_mode) == "historical_nop" .or. &
         trim(initialization_mode) == "historical_aop" .or. &
-        trim(initialization_mode) == "historical_dop") then
+        trim(initialization_mode) == "historical_dop" .or. &
+        trim(initialization_mode) == "historical_qop") then
       if (solve_requested) then
         write(unit, '(a)') "kind=double_core_from_scratch_iteration"
       else
@@ -1471,6 +1545,7 @@ contains
     write(unit, '(a,a)') "terminal_status=", trim(terminal_status)
     write(unit, '(a,a)') "initialization_mode=", trim(initialization_mode)
     write(unit, '(a,a)') "scratch_mesh_kind=", trim(scratch_mesh_kind)
+    write(unit, '(a,es24.16e3)') 'scratch_smooth_stretch=', scratch_smooth_stretch
     write(unit, '(a,es24.16e3)') "scratch_half_width=", &
       scratch_half_width
     write(unit, '(a,es24.16e3)') "seed_half_core_offset=", &
@@ -1493,7 +1568,8 @@ contains
         seed_report%outer_pair_amplitude
     else if (trim(initialization_mode) == "historical_nop" .or. &
              trim(initialization_mode) == "historical_aop" .or. &
-             trim(initialization_mode) == "historical_dop") then
+             trim(initialization_mode) == "historical_dop" .or. &
+             trim(initialization_mode) == "historical_qop") then
       write(unit, '(a,a)') "historical_seed_kind=", &
         historical_seed_report%kind
       write(unit, '(a,es24.16e3)') "historical_seed_core_length_scale=", &
@@ -1581,6 +1657,7 @@ contains
     write(unit, '(a,es24.16e3)') "update_radius_y=", update_radius_y
     write(unit, '(a,l1)') "elliptical_asymptotic_fit=", &
       use_elliptical_asymptotic_fit()
+    write(unit, '(a,i0)') 'trajectory_interpolation_order=', trajectory_interpolation_order
     write(unit, '(a,es24.16e3)') "asymptotic_fit_inner_radius=", &
       asymptotic_fit_inner_radius
     write(unit, '(a,es24.16e3)') "asymptotic_matching_radius=", &
@@ -1703,21 +1780,34 @@ contains
   end subroutine write_residual_metrics
 
 
-  subroutine write_sampled_residuals()
+  subroutine write_sampled_residuals(map_number)
+    integer, optional, intent(in) :: map_number
+    character(len=32) :: suffix
+    character(len=2048) :: output_file, peak_file
     character(len=2048) :: message
     complex(rk) :: difference(3, 3)
     integer :: orbital, point, spin, status, unit
     real(rk) :: coordinate(2), current_gap, current_mean_norm
     real(rk) :: mapped_gap, mapped_mean_norm, maximum_absolute, point_rms
     real(rk) :: sum_squared, value
+    real(rk) :: peak_rms, peak_absolute, rms_coordinate(2), abs_coordinate(2)
 
-    open(newunit=unit, file=trim(sample_file), status="replace", &
+    output_file = sample_file
+    if (present(map_number)) then
+      write(suffix, '(".map",i6.6,".dat")') map_number
+      output_file = trim(sample_file) // trim(suffix)
+    end if
+    peak_rms = -1.0_rk
+    peak_absolute = -1.0_rk
+    rms_coordinate = 0.0_rk
+    abs_coordinate = 0.0_rk
+    open(newunit=unit, file=trim(output_file), status="replace", &
          action="write", iostat=status, iomsg=message)
     if (status /= 0) &
       error stop "cannot open double-core sampled residuals: " // trim(message)
     write(unit, '(a)') &
       "# x y region input_gap mapped_gap gap_difference " // &
-      "input_mean_field_norm mapped_mean_field_norm point_rms maximum_absolute"
+      "input_mean_field_norm mapped_mean_field_norm point_rms maximum_absolute update_mask"
     do point = 1, mesh%point_count()
       if (.not. active_point(point)) cycle
       coordinate = mesh%point_coordinate(point)
@@ -1746,12 +1836,35 @@ contains
           maximum_absolute = max(maximum_absolute, value)
         end do
       end do
-      write(unit, '(2(es24.16e3,1x),i1,1x,7(es24.16e3,1x))') &
+      ! Track the iterated region separately from passive exterior probes.
+      if (update_point(point)) then
+        if (point_rms > peak_rms) then
+          peak_rms = point_rms
+          rms_coordinate = coordinate
+        end if
+        if (maximum_absolute > peak_absolute) then
+          peak_absolute = maximum_absolute
+          abs_coordinate = coordinate
+        end if
+      end if
+      write(unit, '(2(es24.16e3,1x),i1,1x,7(es24.16e3,1x),i1)') &
         coordinate, merge(1, 0, core_point(point)), current_gap, mapped_gap, &
         mapped_gap - current_gap, current_mean_norm, mapped_mean_norm, &
-        point_rms, maximum_absolute
+        point_rms, maximum_absolute, merge(1, 0, update_point(point))
     end do
     close(unit)
+    if (present(map_number)) then
+      peak_file = trim(sample_file) // '.peaks.dat'
+      if (map_number == 1) then
+        open(newunit=unit, file=trim(peak_file), status='replace', action='write')
+        write(unit, '(a)') '# map pre_update_count rms_x rms_y peak_rms max_x max_y peak_absolute'
+      else
+        open(newunit=unit, file=trim(peak_file), status='old', position='append', action='write')
+      end if
+      write(unit, '(2(i8,1x),6(es24.16e3,1x))') map_number, map_number-1, &
+        rms_coordinate, peak_rms, abs_coordinate, peak_absolute
+      close(unit)
+    end if
   end subroutine write_sampled_residuals
 
 

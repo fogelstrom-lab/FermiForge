@@ -1,9 +1,12 @@
 module cartesian_mesh_2d
   use he3_kinds, only : rk
+  use specular_cylinder_2d, only: cylinder_geometry_t
   implicit none
   private
 
   type, public :: cartesian_mesh_2d_t
+    type(cylinder_geometry_t) :: cylinder
+    integer :: trajectory_interpolation_order = 1
     real(rk) :: x_minimum = 0.0_rk
     real(rk) :: x_maximum = 0.0_rk
     real(rk) :: y_minimum = 0.0_rk
@@ -37,9 +40,79 @@ module cartesian_mesh_2d
   public :: make_uniform_cartesian_mesh
   public :: make_rectilinear_cartesian_mesh
   public :: make_symmetric_multiscale_cartesian_mesh
+  public :: make_smooth_cartesian_mesh
+  public :: make_extended_smooth_cartesian_mesh
   public :: make_circular_active_mask
 
 contains
+
+  subroutine make_extended_smooth_cartesian_mesh(core_width,cells,stretch,outer_width,growth,mesh)
+    real(rk), intent(in) :: core_width,stretch,outer_width,growth
+    integer, intent(in) :: cells
+    type(cartesian_mesh_2d_t), intent(out) :: mesh
+    type(cartesian_mesh_2d_t) :: core
+    real(rk), allocatable :: positive(:),coordinates(:)
+    real(rk) :: step, distance, factor
+    integer :: n,i,j
+    if (outer_width<=core_width.or.growth<1.0_rk.or.growth>2.0_rk) &
+      error stop 'invalid extended smooth grid controls'
+    call make_smooth_cartesian_mesh(core_width,cells,stretch,core)
+    step=core%x_cell_spacing(cells-1)
+    distance=outer_width-core_width
+    n=1
+    do
+      if (growth==1.0_rk) then
+        factor=real(n,rk)
+      else
+        factor=(growth**n-1.0_rk)/(growth-1.0_rk)
+      end if
+      if(step*factor>=distance) exit
+      n=n+1
+      if(n>10000) error stop 'too many outer grid bands'
+    end do
+    ! Rescale outer steps together to land exactly at the boundary, avoiding
+    ! a tiny final cell. Preserve all old coordinates, including +/-core_width.
+    step=distance/factor
+    allocate(positive(n),coordinates(cells+1+2*n))
+    positive(1)=core_width+step
+    do i=2,n
+      positive(i)=positive(i-1)+step*growth**(i-1)
+    end do
+    positive(n)=outer_width
+    do i=1,n
+      coordinates(i)=-positive(n-i+1)
+    end do
+    do j=0,cells
+      coordinates(n+j+1)=core%x_coordinate(j)
+    end do
+    coordinates(n+cells+2:)=positive
+    call make_rectilinear_cartesian_mesh(coordinates,coordinates,mesh)
+  end subroutine make_extended_smooth_cartesian_mesh
+
+  subroutine make_smooth_cartesian_mesh(half_width, cells, stretch, mesh)
+    real(rk), intent(in) :: half_width, stretch
+    integer, intent(in) :: cells
+    type(cartesian_mesh_2d_t), intent(out) :: mesh
+    real(rk), allocatable :: coordinates(:)
+    real(rk) :: u
+    integer :: i
+    if (half_width <= 0.0_rk .or. cells < 2 .or. modulo(cells,2) /= 0 .or. &
+        stretch < 0.0_rk .or. stretch > 10.0_rk) &
+      error stop 'smooth grid requires positive width, even cells, stretch in [0,10]'
+    allocate(coordinates(cells+1))
+    do i=0,cells
+      u=real(2*i-cells,rk)/real(cells,rk)
+      if (stretch < 1.0e-8_rk) then
+        coordinates(i+1)=half_width*u
+      else
+        coordinates(i+1)=half_width*sinh(stretch*u)/sinh(stretch)
+      end if
+    end do
+    coordinates(1)=-half_width
+    coordinates(cells+1)=half_width
+    coordinates(cells/2+1)=0.0_rk
+    call make_rectilinear_cartesian_mesh(coordinates,coordinates,mesh)
+  end subroutine make_smooth_cartesian_mesh
 
   subroutine make_uniform_cartesian_mesh(x_minimum, x_maximum, number_of_x_cells, &
                                          y_minimum, y_maximum, number_of_y_cells, mesh)
