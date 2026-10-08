@@ -16,9 +16,8 @@ contains
     type(spinful_state_2d_t), intent(inout) :: state
 
     character(len=2048) :: line, message
-    real(rk) :: row(24), tolerance, expected_x, expected_y
+    real(rk) :: row(24), tolerance, expected_x, expected_y,xy(2)
     integer :: component, ios, orbital, point, position, spin, unit
-    integer :: x_node, y_node
 
     if (.not. state%is_valid_for(mesh)) &
       error stop "cannot read a 2D field into a state that does not match its mesh"
@@ -38,10 +37,8 @@ contains
       read(line, *, iostat=ios, iomsg=message) row
       if (ios /= 0) error stop "invalid 2D field record: " // trim(message)
 
-      x_node = modulo(point - 1, mesh%x_point_count())
-      y_node = (point - 1) / mesh%x_point_count()
-      expected_x = mesh%x_coordinate(x_node)
-      expected_y = mesh%y_coordinate(y_node)
+      xy=mesh%point_coordinate(point)
+      expected_x=xy(1); expected_y=xy(2)
       tolerance = 128.0_rk * epsilon(1.0_rk) * &
         max(1.0_rk, abs(expected_x), abs(expected_y))
       if (abs(row(1) - expected_x) > tolerance .or. &
@@ -94,16 +91,20 @@ contains
     type(spinful_state_2d_t), intent(in) :: state
     character(len=*), intent(in) :: source_label, endpoint_policy
 
-    real(rk) :: pair_density, row(24), x, y
-    integer :: orbital, point, position, spin, x_node, y_node
+    real(rk) :: pair_density, row(24)
+    integer :: orbital, point, position, spin
 
     write(unit, '(a)') "# FermiForge 2D field map version=1"
     write(unit, '(a,a)') "# source=", trim(source_label)
     write(unit, '(a)') "# density_kind=pair_density"
     write(unit, '(a)') "# current_kind=current_related_mean_field"
     write(unit, '(a,a)') "# endpoint_policy=", trim(endpoint_policy)
-    write(unit, '(a,a)') "# mesh_kind=", &
-      merge("uniform    ", "rectilinear", mesh%is_uniform())
+    if(allocated(mesh%disk_xy)) then
+      write(unit,'(a)') '# mesh_kind=annular'
+    else
+      write(unit, '(a,a)') "# mesh_kind=", &
+        merge("uniform    ", "rectilinear", mesh%is_uniform())
+    end if
     write(unit, '(a,es24.16e3)') "# minimum_spacing=", &
       mesh%minimum_spacing()
     write(unit, '(a,es24.16e3)') "# maximum_spacing=", &
@@ -115,13 +116,9 @@ contains
       "A_yx_re A_yx_im A_yy_re A_yy_im A_yz_re A_yz_im " // &
       "A_zx_re A_zx_im A_zy_re A_zy_im A_zz_re A_zz_im " // &
       "pair_density j_x j_y j_z"
-    do y_node = 0, mesh%y_cell_count()
-      y = mesh%y_coordinate(y_node)
-      do x_node = 0, mesh%x_cell_count()
-        x = mesh%x_coordinate(x_node)
-        point = mesh%point_index(x_node, y_node)
+    do point=1,mesh%point_count()
         row = 0.0_rk
-        row(1:2) = [x, y]
+        row(1:2) = mesh%point_coordinate(point)
         position = 2
         do spin = 1, 3
           do orbital = 1, 3
@@ -136,7 +133,6 @@ contains
         row(21) = pair_density
         row(22:24) = state%current_mean_field(:, point)
         write(unit, '(*(es24.16e3,1x))') row
-      end do
     end do
   end subroutine write_field_map_records
 

@@ -15,6 +15,11 @@ module cartesian_mesh_2d
     integer :: number_of_y_cells = 0
     real(rk), allocatable :: x_node_coordinates(:)
     real(rk), allocatable :: y_node_coordinates(:)
+    ! Optional non-tensor-product disk nodes. Transport and nonlinear packing
+    ! use point_count/point_coordinate; Cartesian-only algorithms must not
+    ! interpret these as an x-by-y product.
+    real(rk), allocatable :: disk_xy(:,:), ring_radius(:)
+    integer, allocatable :: ring_start(:), ring_count(:)
   contains
     procedure :: x_cell_count => cartesian_x_cell_count
     procedure :: y_cell_count => cartesian_y_cell_count
@@ -43,8 +48,55 @@ module cartesian_mesh_2d
   public :: make_smooth_cartesian_mesh
   public :: make_extended_smooth_cartesian_mesh
   public :: make_circular_active_mask
+  public :: make_annular_disk_mesh
 
 contains
+
+  subroutine make_annular_disk_mesh(radius,rings,stretch,tangent_spacing,mesh,radial_layout)
+    real(rk), intent(in) :: radius,stretch,tangent_spacing
+    integer, intent(in) :: rings
+    type(cartesian_mesh_2d_t), intent(out) :: mesh
+    character(len=*), optional, intent(in) :: radial_layout
+    logical :: core_wall
+    real(rk) :: u,theta,pi
+    integer :: j,k,n,p
+    core_wall=.false.
+    if(present(radial_layout)) then
+      if(radial_layout/='wall'.and.radial_layout/='core_wall') error stop 'unknown annular radial layout'
+      core_wall=radial_layout=='core_wall'
+    end if
+    if(radius<=0.or.rings<4.or.stretch<0.or.stretch>4.or.tangent_spacing<=0) &
+      error stop 'invalid annular disk controls'
+    pi=acos(-1._rk)
+    allocate(mesh%ring_radius(0:rings),mesh%ring_start(0:rings),mesh%ring_count(0:rings))
+    mesh%ring_radius(0)=0; mesh%ring_count(0)=1; mesh%ring_start(0)=1
+    n=1
+    do j=1,rings
+      u=real(j,rk)/rings
+      if(stretch<1.e-8_rk) then
+        mesh%ring_radius(j)=radius*u
+      else if(core_wall) then
+        mesh%ring_radius(j)=radius*(1+tanh(stretch*(2*u-1))/tanh(stretch))/2
+      else
+        mesh%ring_radius(j)=radius*(1-(exp(stretch*(1-u))-1)/(exp(stretch)-1))
+      end if
+      mesh%ring_count(j)=max(8,4*ceiling(2*pi*mesh%ring_radius(j)/tangent_spacing/4))
+      ! Retain angular resolution of the winding in small inner rings.
+      if(core_wall) mesh%ring_count(j)=max(24,mesh%ring_count(j))
+      mesh%ring_start(j)=n+1; n=n+mesh%ring_count(j)
+    end do
+    mesh%ring_radius(rings)=radius
+    allocate(mesh%disk_xy(2,n)); mesh%disk_xy(:,1)=0
+    do j=1,rings
+      do k=0,mesh%ring_count(j)-1
+        theta=2*pi*k/mesh%ring_count(j); p=mesh%ring_start(j)+k
+        mesh%disk_xy(:,p)=mesh%ring_radius(j)*[cos(theta),sin(theta)]
+      end do
+    end do
+    mesh%x_minimum=-radius; mesh%x_maximum=radius
+    mesh%y_minimum=-radius; mesh%y_maximum=radius
+    mesh%cylinder%enabled=.true.; mesh%cylinder%radius=radius
+  end subroutine
 
   subroutine make_extended_smooth_cartesian_mesh(core_width,cells,stretch,outer_width,growth,mesh)
     real(rk), intent(in) :: core_width,stretch,outer_width,growth
@@ -308,6 +360,7 @@ contains
     class(cartesian_mesh_2d_t), intent(in) :: self
 
     number_of_points = self%x_point_count() * self%y_point_count()
+    if(allocated(self%disk_xy)) number_of_points=size(self%disk_xy,2)
   end function cartesian_point_count
 
 
@@ -444,6 +497,10 @@ contains
 
     if (point < 1 .or. point > self%point_count()) &
       error stop "Cartesian flat point index is out of range"
+    if(allocated(self%disk_xy)) then
+      coordinate=self%disk_xy(:,point)
+      return
+    end if
     point_zero_based = point - 1
     x_node = modulo(point_zero_based, self%x_point_count())
     y_node = point_zero_based / self%x_point_count()
@@ -453,6 +510,12 @@ contains
 
   pure real(rk) function cartesian_minimum_spacing(self) result(spacing)
     class(cartesian_mesh_2d_t), intent(in) :: self
+
+    if(allocated(self%disk_xy)) then
+      spacing=minval(self%ring_radius(1:)-self%ring_radius(:size(self%ring_radius)-2))
+      spacing=min(spacing,minval(2*self%ring_radius(1:)*sin(acos(-1._rk)/self%ring_count(1:))))
+      return
+    end if
 
     if (.not. self%is_valid()) then
       spacing = 0.0_rk
@@ -466,6 +529,12 @@ contains
 
   pure real(rk) function cartesian_maximum_spacing(self) result(spacing)
     class(cartesian_mesh_2d_t), intent(in) :: self
+
+    if(allocated(self%disk_xy)) then
+      spacing=maxval(self%ring_radius(1:)-self%ring_radius(:size(self%ring_radius)-2))
+      spacing=max(spacing,maxval(2*self%ring_radius(1:)*sin(acos(-1._rk)/self%ring_count(1:))))
+      return
+    end if
 
     if (.not. self%is_valid()) then
       spacing = 0.0_rk
@@ -482,6 +551,9 @@ contains
 
     real(rk) :: tolerance
 
+    if(allocated(self%disk_xy)) then
+      uniform=.false.; return
+    end if
     uniform = self%is_valid()
     if (.not. uniform) return
     tolerance = 64.0_rk * epsilon(1.0_rk) * &
@@ -499,6 +571,11 @@ contains
 
   pure logical function cartesian_is_valid(self) result(valid)
     class(cartesian_mesh_2d_t), intent(in) :: self
+
+    if(allocated(self%disk_xy)) then
+      valid=size(self%disk_xy,1)==2.and.size(self%disk_xy,2)>6.and.allocated(self%ring_radius)
+      return
+    end if
 
     valid = self%number_of_x_cells > 0 .and. &
             self%number_of_y_cells > 0 .and. &

@@ -1,5 +1,11 @@
 # Rotationally symmetric specular confinement in new_src
 
+Update, 7 October 2026: an experimental uniform-grid **unconstrained** disk
+path is now available. See [first 2D disk test](UNCONSTRAINED_DISK_TEST.md).
+Radial-mode instructions and historical checks below remain useful; the old
+statement that all cylinder sampling requires radial symmetry is superseded
+only for this new, restricted uniform-grid backend.
+
 ## First no-vortex test: radius 10
 
 From the project root, run:

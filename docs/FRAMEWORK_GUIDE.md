@@ -4,6 +4,32 @@ An editable [LaTeX edition](technical_note/fermiforge_framework_guide.tex)
 includes a vector flowchart and revision history. The two editions are
 maintained together; they are not automatically synchronized.
 
+Revision 0.5 (8 October 2026) adds the experimental **graded annular disk**:
+independent 2D nodes, a wall-clustered radial layout, variable angular counts,
+quadratic sampling and native-node plots. Start with
+`tools/run_annular_disk_B_reference.sh`; see
+[disk tests](UNCONSTRAINED_DISK_TEST.md) for resolution controls and limitations.
+A Cartesian-interior/annular-wall hybrid and automatic refinement are future
+steps, not enabled options.
+
+Revision 0.6 adds `--disk-radial-layout core_wall` and
+`tools/run_annular_disk_normal_core.sh`: a 1877-point unconstrained test from
+the converged R20/T0.30/Fs1=5.4 radial normal-core cylinder, resolving both
+centre and surface. It retains the default wall-only layout for vortex-free runs.
+
+Revision0.7 adds `a_mermin_ho`, the schematic spin-texture `a_panam`, and
+the author's original mixed A/polar seed `a_planar`. Use
+`tools/run_annular_A_texture.sh NAME`. Texture diagnostics distinguish orbital
+chirality from a unit l-vector and report principal spin direction/rank.
+An orbital Pan-Am seed and dipole/Zeeman/rotation energetics remain future work.
+
+LaTeX revision 0.2 (7 October 2026) adds Appendix A, **From COMMON blocks to
+explicit simulation objects**, for readers coming from Fortran 77. It traces
+the actual `3DFS_MPICodes/qcv.dat` COMMON declarations through
+`new_src/global_dec.f90` to modern derived types, explaining allocation,
+component access with `%`, precision, argument intent, type-bound procedures,
+indexing, copying and MPI ownership, with a small worked example.
+
 Code-oriented overview, 6 October 2026. Start here to navigate the package;
 use the linked specialist notes for equations and detailed options. Historical
 benchmark notes describe their own implementation date, not necessarily today's
@@ -28,7 +54,7 @@ a selectable library of arbitrary materials and interfaces.
 |---|---|---|
 | Free vortex, general 2D | Axisymmetric benchmark in `full_2d`, or double-core driver | No cylindrical field symmetry |
 | Free vortex, radial | Axisymmetric benchmark in `radial_symmetry` | Independent +x ray; angular reconstruction imposed |
-| Specular cylinder | Modern cylinder driver | Radial symmetry only; reflected trajectories |
+| Specular cylinder | Modern cylinder driver | Radial or experimental unrestricted uniform-grid disk; reflected trajectories |
 | Legacy comparison | `new_src` | Separate radial solver and conventions |
 | Manufactured demonstration | 2D demo | Prescribed fields, no self-consistency |
 
@@ -172,6 +198,11 @@ authoritative record of the run that was actually launched.
 
 ## 6. A short practical tour
 
+The experimental unrestricted cylinder branch is now available through
+`--spatial-mode full_2d` in the cylinder runner. See the
+[first disk benchmark](UNCONSTRAINED_DISK_TEST.md) for the interior-only sampler,
+limitations, radial-reference launch and independent 2D outputs.
+
 Run commands from `/Users/mikael/Documents/Codex/3he-vortex-modernization`
 (or the equivalent Linux checkout). Required tools are a Fortran compiler,
 MPI, CMake, LAPACK, and Python with NumPy/Matplotlib. Avoid overlapping laptop
@@ -287,7 +318,7 @@ For accelerator work: [BB](BB_ITERATION.md), [Polyak](POLYAK_ITERATION.md),
 
 Implemented does not mean validated for every parameter regime. We have
 radial/full-2D cross-checks, converged vortex experiments and cylinder regression
-checks. We do not yet have unrestricted 2D container-wall sampling, leads and
+checks. We do not yet have general-geometry 2D container-wall sampling, leads and
 spin-active interfaces, a DG backend, GPU execution, or a learned accelerator.
 Automatic mesh adaptation is not a universal solver feature: mesh utilities
 and staged domain studies should not be confused with fully automatic error

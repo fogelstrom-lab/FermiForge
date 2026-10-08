@@ -41,6 +41,7 @@ add_library(he3_mesh
   src/historical_core_seed_2d.f90
   src/spinful_tangent_projection_2d.f90
   src/bilinear_field_sampler_2d.f90
+  src/disk_field_sampler_2d.f90
   src/straight_trajectory_2d.f90
   src/trajectory_self_energy_2d.f90
   src/free_vortex_asymptotic_2d.f90
@@ -181,6 +182,21 @@ endif()
 
 if(BUILD_TESTING)
   add_executable(test_cylinder_bulk_seed tests/test_cylinder_bulk_seed.f90)
+  add_executable(test_disk_field_sampler tests/test_disk_field_sampler.f90)
+  target_link_libraries(test_disk_field_sampler PRIVATE he3_mesh)
+  add_test(NAME disk_field_sampler COMMAND test_disk_field_sampler)
+  add_executable(test_disk_point_map tests/test_disk_point_map.f90)
+  target_link_libraries(test_disk_point_map PRIVATE he3_mesh)
+  add_test(NAME disk_point_map COMMAND test_disk_point_map)
+  add_test(NAME annular_disk_sampler COMMAND test_disk_field_sampler annular)
+  add_test(NAME annular_disk_point_map COMMAND test_disk_point_map annular)
+  add_executable(test_annular_refinement tests/test_annular_refinement.f90)
+  target_link_libraries(test_annular_refinement PRIVATE he3_mesh)
+  add_test(NAME annular_refinement COMMAND test_annular_refinement)
+  add_test(NAME annular_core_wall_refinement COMMAND test_annular_refinement core_wall)
+  add_executable(test_cylinder_texture_seed tests/test_cylinder_texture_seed.f90)
+  target_link_libraries(test_cylinder_texture_seed PRIVATE he3_mesh)
+  add_test(NAME cylinder_texture_seed COMMAND test_cylinder_texture_seed)
   target_link_libraries(test_cylinder_bulk_seed PRIVATE he3_mesh)
   add_test(NAME cylinder_bulk_seed COMMAND test_cylinder_bulk_seed)
   add_executable(test_specular_cylinder_2d tests/test_specular_cylinder_2d.f90)

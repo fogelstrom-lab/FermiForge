@@ -399,6 +399,7 @@ def plot_density_and_current(
         pivot="mid",
         angles="xy",
         scale_units="xy",
+        scale=1.0 if float(np.nanmax(in_plane_magnitude)) < 1e-30 else None,
     )
     axes[1].set_title(
         rf"in-plane {current_label}: $|{vector_symbol}_\perp|$ and direction"

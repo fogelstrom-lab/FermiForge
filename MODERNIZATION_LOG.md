@@ -3348,6 +3348,18 @@ No production calculation was launched.
 
 ## 2026-10-07 — GitHub development handoff
 
+### Framework-guide Fortran primer (after the GitHub handoff)
+
+Added Appendix A to fermiforge_framework_guide.tex, revision 0.2 dated
+7 October 2026. Inspected legacy qcv.dat, transitional global_dec.f90 and
+modern state/mesh/quadrature/accelerator declarations. Explains COMMON versus
+module globals versus explicitly passed objects; allocatables, kind parameters,
+intents, type bindings, flat indexing, deep copying and MPI process-local storage.
+Includes a small illustrative program and notes the real/complex mean-field
+distinction rather than implying a bytewise conversion. Fixed inline percent
+handling with path-style verbatim formatting. Native editor compilation passed.
+Updated navigation links; no solver changes or further GitHub push.
+
 Prepared an explicit source/documentation staging set for the Linux handoff,
 excluding private papers/application documents, local run data, raw benchmark
 archives and build products. Included maintained examples, reference-solver
@@ -3450,3 +3462,124 @@ analytic results are not directly quantitative for our 3D-momentum cylinder;
 bound-state current alone does not equal total current. Physical mass-current
 normalization must be established before angular-momentum benchmarking. No
 new A-phase production run or Git push performed.
+
+## 2026-10-07 — Experimental unconstrained Cartesian disk
+
+Added disk_field_sampler_2d: interior-only quadratic moving least squares on
+uniform square Cartesian cells, compact 3.5h support, capped inverse-distance
+weights, reorthogonalized QR, exact-node interpolation. Tests cover all six
+quadratics, exterior NaN poisoning, near-node stability and wall/off-axis queries.
+Initial uncapped weights lost numerical rank near the displaced wall target;
+the bounded-weight fix is covered by a regression test. No outside ghost values
+or symmetry reconstruction are used in the new transport path.
+
+Cylinder driver/runner now support full_2d with an independent disk mask,
+one-time radial embedding, same-grid 2D restart and optional nonaxisymmetric
+initial perturbation. Existing radial path is retained. No origin or angular
+projection after 2D initialization. Per-map outputs include final/mapped fields;
+plots include actual 2D fields, initial/final Cartesian and harmonic axes,
+residual maps and comparison JSON. Very small quiver autoscaling is safeguarded.
+
+Full build and 48/48 CTests passed with approved MPI access; 30 Python tests
+passed. Polynomial reflected maps agree between radial/2D to 5.55e-17 for both
+collision policies. Perturbed one-update 49-point/2-azimuth tests match exactly
+on one/two ranks (runs 261007-122809-180081 and 261007-122905-488176).
+One-update reference smoke at 197 points/four azimuths completed on ten ranks:
+runs/261007-122954-278729-modern-cylinder-full2d-R10-n0-bulk-b-Fs0.
+Map time about5.9s; initial maximum defect1.0559e-3, concentrated at the wall.
+This deliberately coarse check is not a convergence claim.
+
+Prepared tools/run_disk_2d_B_reference.sh for the user: 797 independent points,
+full32-azimuth reference quadrature, R10/T.3/Fs0, up to5 AA updates. This longer
+run was not launched. Updated the guide to revision0.4; native LaTeX compilation
+succeeded. Validation and limitations are documented in UNCONSTRAINED_DISK_TEST.md.
+No GitHub push performed.
+
+## 2026-10-08: prescribed annular grid for unconstrained disks
+
+Added optional explicit disk coordinates and ring metadata to the existing mesh
+container. Flat point access, state allocation, MPI distribution and Anderson
+packing now support the annular cylinder route without symmetry projection.
+The existing Cartesian and radial paths remain defaults/available options.
+The graded radii use an exponential wall-clustering map; ring populations are
+multiples of four selected from target arc spacing. Origin is a single node.
+
+Annular quadratic MLS uses bounded ring/angle lookup, continuously interpolated
+radial/tangential metric scales, QR and capped inverse-distance weights with
+Gaussian and compact ring/angular tapers. The latter vanish at stencil switches.
+Field-map I/O uses flat coordinates and marks annular files explicitly; native
+checkpoint restart requires identical coordinates. The dedicated plotter uses
+triangles for display only and supplies grid points, field/harmonic maps and
+axis profiles, current-related mean fields, density, residuals and convergence.
+
+Validation: full build and 51/51 CTests passed, including annular polynomial
+reproduction (1.44e-15), radial/annular reflected polynomial map agreement
+(5.55e-17), checkpoint roundtrip and stencil-switch tests. Manufactured surface
+profile maximum errors for 8/16/32 rings and simultaneous angular refinement:
+1.4732e-2, 1.2663e-3, 1.7349e-4. Eight cylinder Python tests passed.
+Two-rank 45-node final-sampler smoke completed and plotted cleanly:
+runs/261008-090854-654694-modern-cylinder-full2d-R10-n0-bulk-b-Fs0.
+An initial deliberately coarse trajectory step 0.5 failed the map check; the
+same small test with normal step 10/99 succeeds. No failed result is used as
+validation. A 585-node radial-seeded reduced-angle integration check also
+completed (261008-090702-200264), before the final support-taper refinement.
+
+Prepared tools/run_annular_disk_B_reference.sh: R10, T0.3, Fs1=0, 585 points,
+16 rings, stretch2, target arc1.25, full32 azimuths, ten ranks, five AA updates,
+p_max3, unchanged reference trajectory controls. Production benchmark left to
+the user. Norms/Anderson products remain node-weighted, not area integrals.
+Hybrid Cartesian interior/annular wall and automatic adaptation are not yet
+implemented. Guide revision0.5 compiled successfully in the native editor.
+No commits, uploads, or changes to reference data.
+
+## 2026-10-08: normal-core annular cylinder benchmark
+
+Added optional core_wall radial layout: symmetric tanh grading at centre and
+wall, with at least24 angular nodes per ring. Default wall layout is unchanged.
+Prepared tools/run_annular_disk_normal_core.sh using the converged radial
+reference runs/261007-103929-261905-modern-cylinder-R20-n1-normal-core-Fs5.4.
+Matched physics/transport: R20, T0.30, Fs1=5.4, winding1, step0.1, half-length160,
+32 azimuths and201 input radial points. Independent grid:32 rings, stretch2,
+arc target1.25,1877 nodes, first/last radial step0.10355, maximum1.28993 xi0.
+Seven rings lie inside2 xi0. Launcher requests five AA updates, p_max3,
+tolerance2e-7 and10 ranks; no symmetry projection maintains a normal core.
+
+Full build,52/52 CTests and8 Python cylinder tests passed. Added simultaneous
+core-Gaussian and wall-profile refinement test, symmetric endpoint-spacing and
+inner angular-coverage checks, plus existing checkpoint/switch-continuity tests.
+A deliberately reduced193-point,two-rank,two-azimuth,half-length5 smoke completed
+one update and plots with clean exit in
+runs/261008-122151-426908-modern-cylinder-full2d-R20-n1-normal-core-Fs5.4.
+It verifies plumbing only, not physical accuracy. Full benchmark left to user.
+Guide updated to revision0.6; no changes to reference data or GitHub uploads.
+
+## 2026-10-08: A texture initializers
+
+Added direct Cartesian-node a_mermin_ho, a_planar and a_panam seeds in
+cylinder_bulk_seed, selected via --texture with initialization=-2/full_2d.
+MH uses an orthonormal triad, beta=pi*r/(2R), and regular centre limit.
+The original short-note formula is preserved under a_planar (not the
+conventional planar phase), including its polar point and varying amplitude.
+Following the user's clarification, a_panam uses MH l and an explicit
+schematic hyperbolic-like spin trial eta=-pi*x*y/(2R²), d=(cos eta,sin eta,0).
+This is not a reconstruction of the GL minimizer. No orbital Pan-Am seed
+was invented; that remains distinct future work.
+
+Seeds start with zero current-related mean fields and old A seed amplitude
+sqrt(2)*legacy B gap. No subsequent A-manifold, spin, or symmetry constraint.
+Seed and restart/reference flags are mutually exclusive; existing bulk-A
+initialization remains unchanged. Metadata documents additional winding vs
+one-quantum texture circulation. Added native orbital/spin diagnostic plots.
+Guide revision0.7 compiles successfully. No GL dipole, Zeeman or rotation
+terms are introduced, and physical texture stability is not claimed.
+
+Analytic regression checks cover pure-A null/norm conditions, l, centre,
+wall pairing, circulation, original polar point and PanAm spin components.
+Three 97-point/two-rank/reduced-angle/short-trajectory smoke runs each completed
+one update with clean exit and plots: 261008-154539-368854 (MH),
+261008-154546-422454 (original), 261008-154553-326570 (spin PanAm).
+Production launcher prepared at tools/run_annular_A_texture.sh; longer runs
+left to user. Reference datasets untouched; no push performed.
+Final verification:53/53 CTests and8 Python cylinder tests passed; native guide
+compilation succeeded. Regenerated and visually inspected spin_texture.png
+for the PanAm smoke run; orbital_texture.png is generated for each new seed.

@@ -1,6 +1,7 @@
 module he3_serial_point_map
   use he3_kinds, only : rk
   use specular_cylinder_2d, only: cylinder_path_t, build_cylinder_path
+  use disk_field_sampler_2d, only: sample_disk_state
   use cartesian_mesh_2d, only : cartesian_mesh_2d_t
   use spinful_state_2d, only : spinful_state_2d_t
   use straight_trajectory_2d, only : straight_trajectory_2d_t, &
@@ -97,10 +98,10 @@ contains
     end if
     if(mesh%cylinder%enabled) then
       if(use_free_vortex_endpoint) error stop 'cylinder cannot use free-vortex endpoints'
-      if(.not.allocated(state%radial_point)) &
-        error stop 'cylinder currently requires radial symmetry; 2D wall stencil not implemented'
-      if(abs(maxval(state%radial_coordinate)-mesh%cylinder%radius)>1.e-10_rk) &
-        error stop 'cylinder radial support must end at wall'
+      if(allocated(state%radial_point)) then
+        if(abs(maxval(state%radial_coordinate)-mesh%cylinder%radius)>1.e-10_rk) &
+          error stop 'cylinder radial support must end at wall'
+      end if
     end if
 
     diagnostics = he3_point_map_diagnostics_t()
@@ -122,8 +123,12 @@ contains
           propagation_self_energy%diagonal_shift(size(reflected%s)))
         do sample=1,size(reflected%s)
           position=reflected%position(:,sample)
-          call state%sample_radial(position(1),position(2),radial_gap,radial_current,inside)
-          if(.not.inside) error stop 'reflected sample outside radial support'
+          if(allocated(state%radial_point)) then
+            call state%sample_radial(position(1),position(2),radial_gap,radial_current,inside)
+          else
+            call sample_disk_state(mesh,state,position(1),position(2),radial_gap,radial_current,inside)
+          end if
+          if(.not.inside) error stop 'invalid reflected field sample or deficient disk stencil'
           propagation_self_energy%triplet_pair_potential(:,sample)= &
             matmul(radial_gap,reflected%momentum(:,sample))
           propagation_self_energy%diagonal_shift(sample)= &

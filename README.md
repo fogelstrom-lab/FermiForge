@@ -45,6 +45,18 @@ Free-vortex accelerator choices include Anderson, BB and Polyak. The cylinder
 currently uses Anderson. General 2D walls, device leads, DG and GPU execution
 remain development targets.
 
+An experimental [unconstrained Cartesian/annular disk test](docs/UNCONSTRAINED_DISK_TEST.md)
+now connects specular trajectories to interior-only quadratic sampling and
+independent 2D iteration. General-geometry boundaries remain future work;
+the disk backend still requires physical refinement benchmarks.
+
+Standalone A-texture trials (`a_mermin_ho`, spin-texture `a_panam`, and the
+original mixed A/polar `a_planar`) are available via
+`bash tools/run_annular_A_texture.sh NAME`. On Linux omit the macOS-only
+`caffeinate` prefix. The runner builds locally; no Mac build or local reference
+run is needed for these texture trials. Radial-reference comparison launchers,
+in contrast, need their referenced data directories transferred separately.
+
 The following is an inventory of foundations and historical validation steps,
 not a list of restrictions to the earliest single-map implementation:
 

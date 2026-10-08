@@ -3,7 +3,10 @@
 ## Living hands-on framework guide
 
 `fermiforge_framework_guide.tex` is the standalone LaTeX edition of the
-hands-on package map (revision 0.1, 6 October 2026). It includes a vector
+hands-on package map (revision 0.7, 8 October 2026). It covers the unconstrained
+Cartesian/annular cylinder and A-texture trials. Appendix A introduces the
+modern data structures for Fortran 77 users, using actual COMMON blocks and
+derived-type declarations from this project. It includes a vector
 flowchart, source-module map, practical exercises and a revision record.
 Open it in the native LaTeX editor for an editable source and PDF preview;
 no external figures or project includes are required. Update its revision/date
